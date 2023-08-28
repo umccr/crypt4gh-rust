@@ -23,21 +23,23 @@ pub fn generate(sk: &str, recipient_pk: &str, input: &str, outfile: &mut File, p
 		edits.push(part.len());
 	}
 
-	eprintln!("Edits: {:?}", edits);
+	log::debug!("Edits: {:?}", edits);
 
 	// Fetch the keys
 
-	eprintln!("SK: {:?}", sk);
+	log::debug!("SK: {:?}", sk);
 	assert!(Path::new(sk).exists());
-	eprintln!("Recipient PK: {:?}", recipient_pk);
+	log::debug!("Recipient PK: {:?}", recipient_pk);
 	assert!(Path::new(recipient_pk).exists(), "Edit list gen key not found");
 
 	let callback = || Ok(passphrase.to_string());
 	let seckey = crypt4gh::keys::get_private_key(Path::new(sk), callback).unwrap();
 	let recipient_pubkey = crypt4gh::keys::get_public_key(Path::new(recipient_pk)).unwrap();
 
-	eprintln!("Sec: {:?}", seckey);
-	eprintln!("Pub: {:?}", recipient_pubkey);
+	log::debug!("Sec: {:?}\n with length: {:?}", seckey, seckey.len());
+	log::debug!("Pub: {:?}\n with length: {:?}", recipient_pubkey, recipient_pubkey.len());
+
+	panic!();
 
 	let keys = vec![crypt4gh::Keys {
 		method: 0,

@@ -187,6 +187,8 @@ fn parse_c4gh_private_key(
 
 	let private_data = decode_string_c4gh(&mut stream)?;
 
+	log::debug!("Private data: {:?}", &private_data);
+
 	if ciphername == "none" {
 		return Ok(private_data);
 	}
@@ -206,7 +208,15 @@ fn parse_c4gh_private_key(
 	let key = chacha20poly1305_ietf::Key::from_slice(&shared_key).ok_or(Crypt4GHError::BadKey)?;
 	let encrypted_data = &private_data[12..];
 
-	Ok(chacha20poly1305_ietf::seal(encrypted_data, None, &nonce, &key))
+	log::debug!("Encrypted data: {:?}", encrypted_data);
+	let privkey_plain = chacha20poly1305_ietf::seal(encrypted_data, None, &nonce, &key);
+
+	eprintln!("libsodium's chacha20poly1305_ietf::seal() key argument: {:?}", &key);
+	eprintln!("libsodium's chacha20poly1305_ietf::seal() nonce argument: {:?}", &nonce);
+	eprintln!("libsodium's chacha20poly1305_ietf::seal() encrypted_data argument: {:?}", &encrypted_data);
+
+	eprintln!("Privkey plaintext: {:?}", &privkey_plain);
+	Ok(privkey_plain)
 }
 
 fn parse_ssh_private_key(
@@ -523,6 +533,7 @@ pub fn generate_private_key() -> Vec<u8> {
 	init();
 	let seckey = randombytes(32);
 	let pubkey = get_public_key_from_private_key(&seckey).unwrap();
+	dbg!(&seckey);
 	vec![seckey, pubkey].concat()
 }
 
