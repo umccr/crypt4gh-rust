@@ -177,7 +177,12 @@ fn decrypt_packet(packet: &[u8], keys: &[Keys], sender_pubkey: &Option<Vec<u8>>)
 		}
 
 		match packet_encryption_method {
-			0 => return decrypt_x25519_chacha20_poly1305(&packet[4..], &key.privkey, sender_pubkey),
+			0 => {
+				let plaintext_packet = decrypt_x25519_chacha20_poly1305(&packet[4..], &key.privkey, sender_pubkey);
+				log::debug!("Decrypting packet: {:#?}\n into plaintext packet: {:#?}\n", &packet[4..], &plaintext_packet);
+				panic!();
+				return plaintext_packet;
+			},
 			1 => unimplemented!("AES-256-GCM support is not implemented"),
 			n => return Err(Crypt4GHError::BadHeaderEncryptionMethod(n)),
 		}
@@ -205,7 +210,7 @@ fn decrypt_x25519_chacha20_poly1305(
 
 	log::debug!("    peer pubkey: {:02x?}", peer_pubkey.iter().format(""));
 	log::debug!("    nonce: {:02x?}", nonce.0.iter().format(""));
-	log::debug!(
+	eprintln!(
 		"    encrypted data ({}): {:02x?}",
 		packet_data.len(),
 		packet_data.iter().format("")
@@ -218,10 +223,13 @@ fn decrypt_x25519_chacha20_poly1305(
 	let server_pk = PublicKey::from_slice(peer_pubkey).ok_or(Crypt4GHError::BadServerPublicKey)?;
 	let (shared_key, _) = x25519blake2b::client_session_keys(&client_pk, &client_sk, &server_pk)
 		.map_err(|_| Crypt4GHError::BadSharedKey)?;
+	
 	log::debug!("shared key: {:02x?}", shared_key.0.iter().format(""));
 
 	// Chacha20_Poly1305
 	let key = chacha20poly1305_ietf::Key::from_slice(&shared_key.0).ok_or(Crypt4GHError::BadSharedKey)?;
+	
+	//panic!();
 	chacha20poly1305_ietf::open(packet_data, None, &nonce, &key).map_err(|_| Crypt4GHError::InvalidData)
 }
 

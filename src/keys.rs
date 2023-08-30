@@ -211,11 +211,11 @@ fn parse_c4gh_private_key(
 	log::debug!("Encrypted data: {:?}", encrypted_data);
 	let privkey_plain = chacha20poly1305_ietf::seal(encrypted_data, None, &nonce, &key);
 
-	eprintln!("libsodium's chacha20poly1305_ietf::seal() key argument: {:?}", &key);
-	eprintln!("libsodium's chacha20poly1305_ietf::seal() nonce argument: {:?}", &nonce);
-	eprintln!("libsodium's chacha20poly1305_ietf::seal() encrypted_data argument: {:?}", &encrypted_data);
+	log::debug!("libsodium's chacha20poly1305_ietf::seal() key argument: {:?}", &key);
+	log::debug!("libsodium's chacha20poly1305_ietf::seal() nonce argument: {:?}", &nonce);
+	log::debug!("libsodium's chacha20poly1305_ietf::seal() encrypted_data argument: {:?}", &encrypted_data);
 
-	eprintln!("Privkey plaintext: {:?}", &privkey_plain);
+	log::debug!("Privkey plaintext: {:?}", &privkey_plain);
 	Ok(privkey_plain)
 }
 
@@ -533,7 +533,6 @@ pub fn generate_private_key() -> Vec<u8> {
 	init();
 	let seckey = randombytes(32);
 	let pubkey = get_public_key_from_private_key(&seckey).unwrap();
-	dbg!(&seckey);
 	vec![seckey, pubkey].concat()
 }
 
