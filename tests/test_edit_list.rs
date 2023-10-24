@@ -15,6 +15,8 @@ at 7pm?
 
 #[test]
 fn test_send_message_buried() {
+	pretty_env_logger::init();
+	
 	// Init
 	let init = Cleanup::new();
 

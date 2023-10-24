@@ -180,7 +180,6 @@ fn decrypt_packet(packet: &[u8], keys: &[Keys], sender_pubkey: &Option<Vec<u8>>)
 			0 => {
 				let plaintext_packet = decrypt_x25519_chacha20_poly1305(&packet[4..], &key.privkey, sender_pubkey);
 				log::debug!("Decrypting packet: {:#?}\n into plaintext packet: {:#?}\n", &packet[4..], &plaintext_packet);
-				panic!();
 				return plaintext_packet;
 			},
 			1 => unimplemented!("AES-256-GCM support is not implemented"),
@@ -210,11 +209,11 @@ fn decrypt_x25519_chacha20_poly1305(
 
 	log::debug!("    peer pubkey: {:02x?}", peer_pubkey.iter().format(""));
 	log::debug!("    nonce: {:02x?}", nonce.0.iter().format(""));
-	eprintln!(
-		"    encrypted data ({}): {:02x?}",
-		packet_data.len(),
-		packet_data.iter().format("")
-	);
+	// eprintln!(
+	// 	"    encrypted data ({}): {:02x?}",
+	// 	packet_data.len(),
+	// 	packet_data.iter().format("")
+	// );
 
 	// X25519 shared key
 	let pubkey = get_public_key_from_private_key(privkey)?;
