@@ -540,6 +540,14 @@ fn decrypt_block(ciphersegment: &[u8], session_keys: &[Vec<u8>]) -> Result<Vec<u
 	let (nonce_slice, data) = ciphersegment.split_at(12);
 	let nonce = Nonce::from_slice(nonce_slice).ok_or(Crypt4GHError::UnableToWrapNonce)?;
 
+	//log::debug!("decrypt_block()'s session_keys' length: {:#?}", session_keys.len());
+	// // eprintln!("decrypt_block()'s session_keys' length: {:#?}", session_keys.len());
+	//println!("decrypt_block()'s session_keys' length: {:#?}", session_keys.len());
+	// dbg!(session_keys.len());
+
+	//println!("HERE!!!");
+	//log::info!("decrypt_block()'s session_keys' length: {:#?}", session_keys.len());	
+
 	session_keys
 		.iter()
 		.find_map(|key| Key::from_slice(key).and_then(|key| chacha20poly1305_ietf::open(data, None, &nonce, &key).ok()))
