@@ -84,7 +84,15 @@ fn test_send_message_buried() -> testresult::TestResult {
 	// 	.succeeds();
 
 	// Compare
-	equal(&temp_file("message.bob"), &temp_file("message.alice"));
+
+	let mut bob = File::open(&temp_file("message.bob")).unwrap();
+	let mut out_copy = vec![];
+	bob.read_to_end(&mut out_copy)?;
+
+	assert_eq!(buf, out_copy);
+
+	// Compare
+	// equal(&temp_file("message.bob"), &temp_file("message.alice"));
 
 	// Cleanup
 	drop(init);
