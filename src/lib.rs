@@ -321,7 +321,7 @@ pub fn decrypt<R: Read, W: Write>(
 		Some(edit_list_content) => body_decrypt_parts(read_buffer, session_keys, write_info, edit_list_content)?,
 	}
 
-	log::info!("Decryption Over");
+	//log::info!("Decryption Over");
 	Ok(())
 }
 
@@ -349,13 +349,12 @@ impl<'a, W: Write> DecryptedBuffer<'a, W> {
 
 		decryptor.fetch();
 		decryptor.decrypt();
-		log::debug!("Index = {}", decryptor.index);
-		log::debug!("");
+		//log::debug!("Index = {}", decryptor.index);
 		decryptor
 	}
 
 	fn fetch(&mut self) {
-		log::debug!("Fetching block {}", self.block);
+		//log::debug!("Fetching block {}", self.block);
 		self.block += 1;
 
 		// Fetches a block
@@ -366,28 +365,26 @@ impl<'a, W: Write> DecryptedBuffer<'a, W> {
 			.unwrap();
 
 		self.is_decrypted = false;
-		log::debug!("");
 	}
 
 	fn decrypt(&mut self) {
 		// Decrypts its buffer
 		if !self.is_decrypted {
-			log::debug!("Decrypting block");
+			//log::debug!("Decrypting block");
 			self.buf = decrypt_block(&self.buf, &self.session_keys).unwrap();
 			self.is_decrypted = true;
 		}
-		log::debug!("");
 	}
 
 	fn skip(&mut self, size: usize) {
 		assert!(size > 0, "You shouldn't skip 0 bytes");
-		log::debug!("Skipping {} bytes | Buffer size: {}", size, self.buf.len());
+		//log::debug!("Skipping {} bytes | Buffer size: {}", size, self.buf.len());
 
 		let mut remaining_size = size;
 
 		// Skip fetches
 		while remaining_size > 0 {
-			log::debug!("Left to skip: {} | Buffer size: {}", remaining_size, self.buf.len());
+			//log::debug!("Left to skip: {} | Buffer size: {}", remaining_size, self.buf.len());
 
 			if remaining_size >= SEGMENT_SIZE {
 				self.fetch();
@@ -398,13 +395,12 @@ impl<'a, W: Write> DecryptedBuffer<'a, W> {
 					self.fetch();
 				}
 				self.index = (self.index + remaining_size) % SEGMENT_SIZE;
-				log::debug!("Index = {}", self.index);
+				//log::debug!("Index = {}", self.index);
 				remaining_size -= remaining_size;
 			}
 		}
 
-		log::debug!("Finished skipping");
-		log::debug!("");
+		//log::debug!("Finished skipping");
 
 		// Apply
 		self.decrypt();
@@ -412,13 +408,13 @@ impl<'a, W: Write> DecryptedBuffer<'a, W> {
 
 	fn read(&mut self, size: usize) -> usize {
 		assert!(size > 0, "You shouldn't read 0 bytes");
-		log::debug!("Reading {} bytes | Buffer size: {}", size, self.buf.len());
+		//log::debug!("Reading {} bytes | Buffer size: {}", size, self.buf.len());
 
 		let mut remaining_size = size;
 
 		while remaining_size > 0 {
 			// Get read length
-			log::debug!("Left to read: {} | Buffer size: {}", remaining_size, self.buf.len());
+			//log::debug!("Left to read: {} | Buffer size: {}", remaining_size, self.buf.len());
 			let n_bytes = usize::min(SEGMENT_SIZE - self.index, remaining_size);
 
 			// Process
@@ -429,7 +425,7 @@ impl<'a, W: Write> DecryptedBuffer<'a, W> {
 
 			// Advance
 			self.index = (self.index + n_bytes) % self.buf.len();
-			log::debug!("Index = {}", self.index);
+			//log::debug!("Index = {}", self.index);
 			if self.index == 0 {
 				self.fetch();
 			}
@@ -438,7 +434,7 @@ impl<'a, W: Write> DecryptedBuffer<'a, W> {
 			remaining_size -= n_bytes;
 		}
 
-		log::debug!("Finished reading");
+		//log::debug!("Finished reading");
 		log::debug!("");
 
 		size
@@ -539,14 +535,6 @@ pub fn body_decrypt<W: Write>(
 fn decrypt_block(ciphersegment: &[u8], session_keys: &[Vec<u8>]) -> Result<Vec<u8>, Crypt4GHError> {
 	let (nonce_slice, data) = ciphersegment.split_at(12);
 	let nonce = Nonce::from_slice(nonce_slice).ok_or(Crypt4GHError::UnableToWrapNonce)?;
-
-	//log::debug!("decrypt_block()'s session_keys' length: {:#?}", session_keys.len());
-	// // eprintln!("decrypt_block()'s session_keys' length: {:#?}", session_keys.len());
-	//println!("decrypt_block()'s session_keys' length: {:#?}", session_keys.len());
-	// dbg!(session_keys.len());
-
-	//println!("HERE!!!");
-	//log::info!("decrypt_block()'s session_keys' length: {:#?}", session_keys.len());	
 
 	session_keys
 		.iter()

@@ -1,9 +1,13 @@
 mod edit_list_gen;
 mod test_common;
 
-use std::fs::File;
+use std::path::Path;
+use std::{fs::File, path::PathBuf};
 
 pub use test_common::*;
+use crypt4gh::keys::get_private_key;
+use crypt4gh::Keys;
+use std::io::Read;
 
 const INPUT_EDIT_LIST: &str = "Let's have
  beers 
@@ -14,7 +18,7 @@ at 7pm?
 ";
 
 #[test]
-fn test_send_message_buried() {
+fn test_send_message_buried() -> testresult::TestResult {
 	pretty_env_logger::init();
 	
 	// Init
@@ -36,7 +40,40 @@ fn test_send_message_buried() {
 		BOB_PASSPHRASE,
 	);
 
-	// Decrypt
+	// // Decrypt
+	// let sender_pubkey = None;
+	// let (range_start, range_span) = (0, None);
+
+	// let path = PathBuf::from("tests/testfiles/alice.sec");
+	// let seckey = get_private_key(&path, || Ok("alice".to_string()))?;
+
+	// let keys = vec![Keys {
+	// 	method: 0,
+	// 	privkey: seckey,
+	// 	recipient_pubkey: vec![],
+	// }];
+
+	// // log::debug!("run_decrypt()'s parameters: {:#?}, {}, {:#?}, {:#?}", &keys, range_start, range_span, &sender_pubkey );
+
+	// let mut file = File::open(PathBuf::from("tests/tempfiles/message.bob.c4gh"))?;
+	
+	// let mut out = vec![];
+	// file.read_to_end(&mut out)?;
+	// println!("message: {:?}", out);
+
+	// let mut buf_in = std::io::BufReader::new(&out[..]);
+
+	// let mut buf = vec![];
+	// // Decrypt
+	// crypt4gh::decrypt(
+	// 	&keys,
+	// 	&mut buf_in,
+	// 	&mut buf,
+	// 	range_start,
+	// 	range_span,
+	// 	&sender_pubkey,
+	// )?;
+	
 	CommandUnderTest::new()
 		.env("C4GH_PASSPHRASE", ALICE_PASSPHRASE)
 		.arg("decrypt")
@@ -51,4 +88,6 @@ fn test_send_message_buried() {
 
 	// Cleanup
 	drop(init);
+
+	Ok(())
 }
