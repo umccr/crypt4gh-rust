@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use sodiumoxide::crypto::aead::chacha20poly1305_ietf;
 use sodiumoxide::crypto::kx::{x25519blake2b, PublicKey, SecretKey};
@@ -75,17 +74,17 @@ fn encrypt_x25519_chacha20_poly1305(
 	let pubkey = get_public_key_from_private_key(seckey)?;
 
 	// Log
-	log::debug!("   packed data({}): {:02x?}", data.len(), data.iter().format(""));
-	log::debug!("   my public key({}): {:02x?}", pubkey.len(), pubkey.iter().format(""));
+	log::debug!("   packed data({}): {:02x?}", data.len(), data);
+	log::debug!("   public key({}): {:02x?}", pubkey.len(), pubkey);
 	log::debug!(
-		"   my private key({}): {:02x?}",
+		"   private key({}): {:02x?}",
 		seckey[0..32].len(),
-		&seckey[0..32].iter().format("")
+		&seckey[0..32]
 	);
 	log::debug!(
 		"   recipient public key({}): {:02x?}",
 		recipient_pubkey.len(),
-		recipient_pubkey.iter().format("")
+		recipient_pubkey
 	);
 
 	// X25519 shared key
@@ -94,7 +93,7 @@ fn encrypt_x25519_chacha20_poly1305(
 	let client_pk = PublicKey::from_slice(recipient_pubkey).ok_or(Crypt4GHError::BadClientPublicKey)?;
 	let (_, shared_key) = x25519blake2b::server_session_keys(&server_pk, &server_sk, &client_pk)
 		.map_err(|_| Crypt4GHError::BadSharedKey)?;
-	log::debug!("   shared key: {:02x?}", shared_key.0.iter().format(""));
+	log::debug!("   shared key: {:02x?}", shared_key.0);
 
 	// Nonce & chacha20 key
 	let nonce =
@@ -195,7 +194,7 @@ fn decrypt_x25519_chacha20_poly1305(
 	privkey: &[u8],
 	sender_pubkey: &Option<Vec<u8>>,
 ) -> Result<Vec<u8>, Crypt4GHError> {
-	log::debug!("    my secret key: {:02x?}", &privkey[0..32].iter().format(""));
+	log::debug!("    secret key: {:02x?}", &privkey[0..32]);
 
 	let peer_pubkey = &encrypted_part[0..32];
 
@@ -207,13 +206,9 @@ fn decrypt_x25519_chacha20_poly1305(
 		.ok_or(Crypt4GHError::NoNonce)?;
 	let packet_data = &encrypted_part[44..];
 
-	log::debug!("    peer pubkey: {:02x?}", peer_pubkey.iter().format(""));
-	log::debug!("    nonce: {:02x?}", nonce.0.iter().format(""));
-	// eprintln!(
-	// 	"    encrypted data ({}): {:02x?}",
-	// 	packet_data.len(),
-	// 	packet_data.iter().format("")
-	// );
+	log::debug!("    peer pubkey: {:02x?}", peer_pubkey);
+	log::debug!("    nonce: {:02x?}", nonce.0);
+	log::debug!("    encrypted data ({}): {:02x?}", packet_data.len(), packet_data);
 
 	// X25519 shared key
 	let pubkey = get_public_key_from_private_key(privkey)?;
@@ -223,7 +218,7 @@ fn decrypt_x25519_chacha20_poly1305(
 	let (shared_key, _) = x25519blake2b::client_session_keys(&client_pk, &client_sk, &server_pk)
 		.map_err(|_| Crypt4GHError::BadSharedKey)?;
 	
-	log::debug!("shared key: {:02x?}", shared_key.0.iter().format(""));
+	log::debug!("shared key: {:02x?}", shared_key.0);
 
 	// Chacha20_Poly1305
 	let key = chacha20poly1305_ietf::Key::from_slice(&shared_key.0).ok_or(Crypt4GHError::BadSharedKey)?;
