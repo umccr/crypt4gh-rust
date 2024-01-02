@@ -20,11 +20,12 @@ use crypto_kx::{Keypair, SecretKey};
 
 use aes::cipher::{KeyInit, KeyIvInit};
 use aes::cipher::consts::U48;
+use aes::Aes256Enc;
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::aead::OsRng;
 use chacha20poly1305::{self, ChaCha20Poly1305};
 
-use ctr;
+// use ctr;
 
 use curve25519_dalek::montgomery::MontgomeryPoint;
 use curve25519_dalek::traits::IsIdentity;
@@ -351,29 +352,34 @@ fn decipher(ciphername: &str, data: &[u8], private_ciphertext: &[u8]) -> Result<
 	let mut reader: Vec<u8> = vec![];
 	let output = vec![0_u8; private_ciphertext.len()];
 
-	BufReader::new(private_ciphertext).read_to_end(&mut reader)?;
-	let mut writer = BufWriter::new(output);
+	BufReader::new(private_ciphertext).read_to_end(&mut reader)?; // TODO: Might not be the best to read it all at once 
+																			 // since we do streaming right below in the match arms?
+	let w = BufWriter::new(output);
+	let mut writer = w.into_inner().map_err(|err| Crypt4GHError::IoError(err.into_error()))?;
 
 	// log::debug!("Input ciphername is: {}", ciphername);
 	// log::debug!("Private ciphertext is: {:#?}", private_ciphertext);
 
 	// Decipher
 	match ciphername {
-		"aes128-ctr" => {
-			type Aes128Ctr = ctr::Ctr128LE<aes::Aes128Enc>;
-			let mut cipher = Aes128Ctr::new(key.into(), iv_ga);
-			cipher.apply_keystream_b2b(&reader, writer.get_mut()).map_err(|_| Crypt4GHError::BadCiphername(String::from("aes128-ctr")))?
-		},
-		"aes192-ctr" => {
-			type Aes192Ctr = ctr::Ctr128LE<aes::Aes192Enc>;
-			let mut cipher = Aes192Ctr::new(key.into(), iv_ga);
-			cipher.apply_keystream_b2b(&reader, writer.get_mut()).map_err(|_| Crypt4GHError::BadCiphername(String::from("aes192-ctr")))?
-		},
+		// "aes128-ctr" => {
+		// 	type Aes128Ctr = ctr::Ctr128LE<aes::Aes128Enc>;
+		// 	let mut cipher = Aes128Ctr::new(key.into(), iv_ga);
+		// 	cipher.apply_keystream_b2b(&reader, &mut writer);
+		// },
+		// "aes192-ctr" => {
+		// 	type Aes192Ctr = ctr::Ctr128LE<aes::Aes192Enc>;
+		// 	let mut cipher = Aes192Ctr::new(key.into(), iv_ga);
+		// 	cipher.apply_keystream_b2b(&reader, &mut writer);
+		// },
+		//
+		/* Old code:
+		"aes256-ctr" => crypto::aes::ctr(crypto::aes::KeySize::KeySize256, key, iv)
+            .decrypt(&mut reader, &mut writer, true)
+            .map_err(Crypt4GHError::DecryptKeyError)?,
+		 */
 		"aes256-ctr" => {
-			type Aes256Ctr = ctr::Ctr128LE<aes::Aes256Enc>;
-			let mut cipher = Aes256Ctr::new(key.into(), iv_ga);
-			log::debug!("Reading reader: {:#?}", &reader);
-			cipher.apply_keystream_b2b(&reader, &mut writer.get_mut()).map_err(|_| Crypt4GHError::BadCiphername(String::from("aes256-ctr")))?
+			let mut cipher = Aes256Enc::new(&GenericArray::from_slice(key));
 		},
 		"aes128-cbc" => {
 			todo!();
@@ -388,7 +394,8 @@ fn decipher(ciphername: &str, data: &[u8], private_ciphertext: &[u8]) -> Result<
 		unknown_cipher => return Err(Crypt4GHError::BadCiphername(unknown_cipher.into())),
 	}
 
-	writer.into_inner().map_err(|err| Crypt4GHError::IoError(err.into_error()))
+	output = writer;
+	Ok(writer)
 }
 
 fn block_size(ciphername: &str) -> Result<usize, Crypt4GHError> {
