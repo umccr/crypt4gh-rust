@@ -21,6 +21,8 @@
 	clippy::redundant_else
 )]
 
+use wasm_bindgen::prelude::*;
+
 use rand::{SeedableRng, RngCore, Rng};
 use rand_chacha;
 
@@ -263,10 +265,11 @@ pub fn encrypt_segment(data: &[u8], nonce: Nonce, key: &Key) -> Result<Vec<u8>, 
 /// In case that `range_span` is none, it will encrypt from `range_start` to the end of the input.
 /// If `sender_pubkey` is specified the program will check that the `recipient_key` in the message
 /// is the same as the `sender_pubkey`.
-pub fn decrypt<R: Read, W: Write>(
+#[wasm_bindgen]
+pub fn decrypt(
 	keys: &[Keys],
-	read_buffer: &mut R,
-	write_buffer: &mut W,
+	read_buffer: &[u8],
+	write_buffer: &mut [u8],
 	range_start: usize,
 	range_span: Option<usize>,
 	sender_pubkey: &Option<Vec<u8>>,

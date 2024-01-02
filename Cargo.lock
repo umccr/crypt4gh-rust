@@ -255,6 +255,7 @@ dependencies = [
  "serde",
  "testresult",
  "thiserror",
+ "wasm-bindgen",
 ]
 
 [[package]]
