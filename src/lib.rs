@@ -34,6 +34,8 @@ use header::DecryptedHeaderPackets;
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{ self, ChaCha20Poly1305, Key, KeyInit, Nonce };
 
+use serde::{ Serialize, Deserialize };
+
 use crate::error::Crypt4GHError;
 
 /// Generate and parse a `Crypt4GH` header.
@@ -90,7 +92,7 @@ impl<'a, W: Write> WriteInfo<'a, W> {
 	}
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 /// Key information.
 pub struct Keys {
 	/// Method used for the key encryption.
