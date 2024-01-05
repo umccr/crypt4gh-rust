@@ -244,6 +244,7 @@ dependencies = [
  "ed25519_to_curve25519",
  "getrandom",
  "itertools",
+ "js-sys",
  "lazy_static",
  "log",
  "pretty_env_logger",

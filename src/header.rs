@@ -392,7 +392,7 @@ pub fn rearrange<'a>(
 ) -> Result<(Vec<Vec<u8>>, impl Iterator<Item = bool> + 'a), Crypt4GHError> {
 	if range_span <= Some(0) {
 		//assert!(span > 0, "Span should be greater than 0");
-		return Err(Crypt4GHError::InvalidRangeSpan(range_span));
+		return Err(Crypt4GHError::InvalidRangeSpan);
 	}
 
 	log::info!("Rearranging the header");

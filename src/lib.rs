@@ -21,7 +21,6 @@
 	clippy::redundant_else
 )]
 
-use wasm_bindgen::convert::{RefMutFromWasmAbi, RefFromWasmAbi};
 use wasm_bindgen::prelude::*;
 
 use rand::{SeedableRng, RngCore, Rng};
@@ -29,7 +28,6 @@ use rand_chacha;
 
 use std::collections::HashSet;
 use std::io::{self, Read, Write};
-use std::ops::DerefMut;
 
 use header::DecryptedHeaderPackets;
 
@@ -104,36 +102,6 @@ pub struct Keys {
 	/// Public key of the recipient (the key you want to encrypt for).
 	pub recipient_pubkey: Vec<u8>,
 }
-
-
-impl RefMutFromWasmAbi for Keys {
-    type Abi = <JsValue as RefFromWasmAbi>::Abi;
-
-    type Anchor = dyn DerefMut<Target = Self>;
-
-    unsafe fn ref_mut_from_abi(js: Self::Abi) -> Self::Anchor {
-        todo!()
-    }
-
-    // unsafe fn ref_mut_from_abi(js: Self::Abi) -> Self::Anchor {
-    //     TsifyRefMut::new(js)
-    // }
-}
-
-impl RefFromWasmAbi for Keys {
-    type Abi = <JsValue as RefFromWasmAbi>::Abi;
-
-    type Anchor = dyn DerefMut<Target = Self>;
-
-    unsafe fn ref_from_abi(js: Self::Abi) -> Self::Anchor {
-        todo!()
-    }
-
-    // unsafe fn ref_mut_from_abi(js: Self::Abi) -> Self::Anchor {
-    //     TsifyRefMut::new(js)
-    // }
-}
-
 
 /// Reads from the `read_buffer` and writes the encrypted data to `write_buffer`.
 ///
@@ -300,7 +268,7 @@ pub fn encrypt_segment(data: &[u8], nonce: Nonce, key: &Key) -> Result<Vec<u8>, 
 /// is the same as the `sender_pubkey`.
 #[wasm_bindgen]
 pub fn decrypt(
-	keys: &[Keys],
+	keys: js_sys::Array, // &[Keys],
 	read_buffer: &[u8],
 	write_buffer: &mut [u8],
 	range_start: usize,
