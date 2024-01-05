@@ -21,6 +21,7 @@
 	clippy::redundant_else
 )]
 
+use wasm_bindgen::convert::{RefMutFromWasmAbi, RefFromWasmAbi};
 use wasm_bindgen::prelude::*;
 
 use rand::{SeedableRng, RngCore, Rng};
@@ -28,13 +29,12 @@ use rand_chacha;
 
 use std::collections::HashSet;
 use std::io::{self, Read, Write};
+use std::ops::DerefMut;
 
 use header::DecryptedHeaderPackets;
 
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{ self, ChaCha20Poly1305, Key, KeyInit, Nonce };
-
-use serde::{ Serialize, Deserialize };
 
 use crate::error::Crypt4GHError;
 
@@ -92,7 +92,8 @@ impl<'a, W: Write> WriteInfo<'a, W> {
 	}
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
+#[wasm_bindgen]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 /// Key information.
 pub struct Keys {
 	/// Method used for the key encryption.
@@ -103,6 +104,36 @@ pub struct Keys {
 	/// Public key of the recipient (the key you want to encrypt for).
 	pub recipient_pubkey: Vec<u8>,
 }
+
+
+impl RefMutFromWasmAbi for Keys {
+    type Abi = <JsValue as RefFromWasmAbi>::Abi;
+
+    type Anchor = dyn DerefMut<Target = Self>;
+
+    unsafe fn ref_mut_from_abi(js: Self::Abi) -> Self::Anchor {
+        todo!()
+    }
+
+    // unsafe fn ref_mut_from_abi(js: Self::Abi) -> Self::Anchor {
+    //     TsifyRefMut::new(js)
+    // }
+}
+
+impl RefFromWasmAbi for Keys {
+    type Abi = <JsValue as RefFromWasmAbi>::Abi;
+
+    type Anchor = dyn DerefMut<Target = Self>;
+
+    unsafe fn ref_from_abi(js: Self::Abi) -> Self::Anchor {
+        todo!()
+    }
+
+    // unsafe fn ref_mut_from_abi(js: Self::Abi) -> Self::Anchor {
+    //     TsifyRefMut::new(js)
+    // }
+}
+
 
 /// Reads from the `read_buffer` and writes the encrypted data to `write_buffer`.
 ///

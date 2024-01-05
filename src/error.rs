@@ -1,14 +1,15 @@
-use std::error::Error;
-use std::path::PathBuf;
-
 use thiserror::Error;
 
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
 #[derive(Debug, Error)]
 pub enum Crypt4GHError {
 	// User errors
 	#[error("No Recipients' Public Key found")]
 	NoRecipients,
 	#[error("Invalid range span: {0:?}")]
+	//#[cfg(not(target_arch = "wasm32"))]
 	InvalidRangeSpan(Option<usize>),
 	#[error("The edit list is empty")]
 	EmptyEditList,
