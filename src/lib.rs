@@ -107,8 +107,6 @@ pub struct Keys {
 /// In case that `range_span` is none, it will encrypt from `range_start` to the end of the input.
 pub fn encrypt<R: Read, W: Write>(
 	recipient_keys: &HashSet<Keys>,
-	read_buffer: &mut R,
-	write_buffer: &mut W,
 	range_start: usize,
 	range_span: Option<usize>,
 ) -> Result<(), Crypt4GHError> {
@@ -124,11 +122,11 @@ pub fn encrypt<R: Read, W: Write>(
 		log::info!("Forwarding to position: {}", range_start);
 	}
 
-	read_buffer
-		.by_ref()
-		.take(range_start as u64)
-		.read_to_end(&mut Vec::new())
-		.map_err(|e| Crypt4GHError::NotEnoughInput(range_start, e.into()))?;
+	// read_buffer
+	// 	.by_ref()
+	// 	.take(range_start as u64)
+	// 	.read_to_end(&mut Vec::new())
+	// 	.map_err(|e| Crypt4GHError::NotEnoughInput(range_start, e.into()))?;
 
 	log::debug!("    Span: {:?}", range_span);
 
@@ -263,14 +261,13 @@ pub fn encrypt_segment(data: &[u8], nonce: Nonce, key: &Key) -> Result<Vec<u8>, 
 /// In case that `range_span` is none, it will encrypt from `range_start` to the end of the input.
 /// If `sender_pubkey` is specified the program will check that the `recipient_key` in the message
 /// is the same as the `sender_pubkey`.
-pub fn decrypt<R: Read, W: Write>(
+pub fn decrypt(
+	payload: &[u8],
 	keys: &[Keys],
-	read_buffer: &mut R,
-	write_buffer: &mut W,
 	range_start: usize,
 	range_span: Option<usize>,
 	sender_pubkey: &Option<Vec<u8>>,
-) -> Result<(), Crypt4GHError> {
+) -> Result<Vec<u8>, Crypt4GHError> {
 	range_span.map_or_else(
 		|| {
 			log::info!("Decrypting file | Range: [{}, EOF)", range_start);
@@ -281,11 +278,8 @@ pub fn decrypt<R: Read, W: Write>(
 	);
 
 	// Get header info
-	let mut temp_buf = [0_u8; 16]; // Size of the header
-	read_buffer
-		.read_exact(&mut temp_buf)
-		.map_err(|e| Crypt4GHError::ReadHeaderError(e.into()))?;
-	let header_info: header::HeaderInfo = header::deconstruct_header_info(&temp_buf)?;
+	let header = payload.get(0..16);
+	let header_info = header::deconstruct_header_info(header)?;
 
 	// Calculate header packets
 	let encrypted_packets = (0..header_info.packets_count)

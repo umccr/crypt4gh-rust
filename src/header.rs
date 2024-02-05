@@ -332,10 +332,10 @@ pub fn deconstruct_header_body(
 ///
 /// Reads the magic number, the version and the number of packets from the bytes.
 pub fn deconstruct_header_info(
-	header_info_file: &[u8; std::mem::size_of::<HeaderInfo>()],
+	header_info_file: Option<&[u8; 16]>, // TODO: HeaderInfo::len()
 ) -> Result<HeaderInfo, Crypt4GHError> {
 	let header_info =
-		bincode::deserialize::<HeaderInfo>(header_info_file).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
+		bincode::deserialize::<HeaderInfo>(header_info_file.unwrap()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
 
 	if &header_info.magic_number != MAGIC_NUMBER {
 		return Err(Crypt4GHError::MagicStringError);

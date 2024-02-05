@@ -1,172 +1,54 @@
 mod test_common;
 
-use std::{path::PathBuf, fs::File, io::Read};
-
 use crypt4gh::{keys::get_private_key, Keys};
+use rand::Rng;
+use rand_chacha::rand_core::OsRng;
+use ssh_key::PrivateKey;
 pub use test_common::*;
 use testresult::TestResult;
 
-// #[test]
-// fn encrypt_ssh_decrypt() -> TestResult {
-// 	// Init
-// 	let init = Cleanup::new();
-
-// 	// Create random file
-// 	new_random_file(&temp_file("random.10MB"), 10);
-
-// 	remove_file(&temp_file(BOB_PUBKEY_SSH));
-// 	remove_file(&temp_file(BOB_SECKEY_SSH));
-
-// 	ssh_gen(&temp_file(BOB_SECKEY_SSH), BOB_PASSPHRASE);
-
-// 	// Encrypt
-// 	CommandUnderTest::new()
-// 		.env("C4GH_PASSPHRASE", BOB_PASSPHRASE)
-// 		.arg("encrypt")
-// 		.arg("--sk")
-// 		.arg(&strip_prefix(BOB_SECKEY_SSH))
-// 		.arg("--recipient_pk")
-// 		.arg(ALICE_PUBKEY)
-// 		.pipe_in(&temp_file("random.10MB"))
-// 		.pipe_out(&temp_file("random.10MB.c4gh"))
-// 		.succeeds();
-
-// 	// Decrypt
-// 	CommandUnderTest::new()
-// 		.env("C4GH_PASSPHRASE", ALICE_PASSPHRASE)
-// 		.arg("decrypt")
-// 		.arg("--sk")
-// 		.arg(ALICE_SECKEY)
-// 		.pipe_in(&temp_file("random.10MB.c4gh"))
-// 		.pipe_out(&temp_file("random.10MB.received"))
-// 		.succeeds();
-
-// 	// Compare
-// 	equal(&temp_file("random.10MB"), &temp_file("random.10MB.received"));
-
-// 	// Cleanup
-// 	drop(init);
-
-// 	Ok(())
-// }
-
 #[test]
-fn encrypt_decrypt_ssh() -> TestResult{
+fn encrypt_decrypt_ssh() -> TestResult {
 	// Init
 	let init = Cleanup::new();
 	pretty_env_logger::init();
+	let mut rng = rand::thread_rng();
 
-	// Create random file
-	new_random_file(&temp_file("random.10MB"), 10);
+	// Generate 10MB of "cleartext" payload
+	let mut cleartext = vec![0u8; 10 * 1024 * 1024];
+	rng.fill(&mut cleartext[..]);
 
-	remove_file(&temp_file(ALICE_PUBKEY_SSH));
-	remove_file(&temp_file(ALICE_SECKEY_SSH));
-
-	ssh_gen(&temp_file(ALICE_SECKEY_SSH), ALICE_PASSPHRASE);
-
+	// Generate a random SSH key, no pubkey for sender and no range values
+	let private_key = PrivateKey::random(&mut OsRng, ssh_key::Algorithm::Ed25519)?;
 	let sender_pubkey = None;
 	let (range_start, range_span) = (0, None);
 
-	let seckey = get_private_key(PathBuf::from("tests/tempfiles/alice.sshkey"), Ok(ALICE_PASSPHRASE.to_string()))?;
-
 	let keys = vec![Keys {
 		method: 0,
-		privkey: seckey,
+		privkey: private_key.to_bytes()?.to_vec(),
 		recipient_pubkey: vec![],
 	}];
 
-	let mut file = File::open(PathBuf::from("tests/tempfiles/random.10MB.c4gh"))?;
-
-	let mut out = vec![];
-	file.read_to_end(&mut out)?;
-
-	let mut buf_in = std::io::BufReader::new(&out[..]);
-	let mut buf = vec![];
-	
 	// Encrypt
-	CommandUnderTest::new()
-		.env("C4GH_PASSPHRASE", BOB_PASSPHRASE)
-		.arg("encrypt")
-		.arg("--sk")
-		.arg(BOB_SECKEY)
-		.arg("--recipient_pk")
-		.arg(&strip_prefix(ALICE_PUBKEY_SSH))
-		.pipe_in(&temp_file("random.10MB"))
-		.pipe_out(&temp_file("random.10MB.c4gh"))
-		.succeeds();
+	let cryptext = crypt4gh::encrypt(
+		&keys, 
+		range_start, 
+		range_span
+	);
 
 	// Decrypt
-	crypt4gh::decrypt(
+	let plaintext = crypt4gh::decrypt(
 		&keys,
-		&mut buf_in,
-		&mut buf,
 		range_start,
 		range_span,
 		&sender_pubkey,
 	)?;
 
-	// Decrypt
-	// CommandUnderTest::new()
-	// 	.env("C4GH_PASSPHRASE", ALICE_PASSPHRASE)
-	// 	.arg("decrypt")
-	// 	.arg("--sk")
-	// 	.arg(&strip_prefix(ALICE_SECKEY_SSH))
-	// 	.pipe_in(&temp_file("random.10MB.c4gh"))
-	// 	.pipe_out(&temp_file("random.10MB.received"))
-	// 	.succeeds();
-
 	// Compare
-	equal(&temp_file("random.10MB"), &temp_file("random.10MB.received"));
+	equal(&cleartext, &plaintext);
 
 	// Cleanup
 	drop(init);
 
 	Ok(())
 }
-
-// #[test]
-// fn encrypt_ssh_decrypt_ssh() -> TestResult {
-// 	// Init
-// 	let init = Cleanup::new();
-
-// 	// Create random file
-// 	new_random_file(&temp_file("random.10MB"), 10);
-
-// 	remove_file(&temp_file(ALICE_PUBKEY_SSH));
-// 	remove_file(&temp_file(ALICE_SECKEY_SSH));
-// 	remove_file(&temp_file(BOB_PUBKEY_SSH));
-// 	remove_file(&temp_file(BOB_SECKEY_SSH));
-
-// 	ssh_gen(&temp_file(ALICE_SECKEY_SSH), ALICE_PASSPHRASE);
-// 	ssh_gen(&temp_file(BOB_SECKEY_SSH), BOB_PASSPHRASE);
-
-// 	// Encrypt
-// 	CommandUnderTest::new()
-// 		.env("C4GH_PASSPHRASE", BOB_PASSPHRASE)
-// 		.arg("encrypt")
-// 		.arg("--sk")
-// 		.arg(&strip_prefix(BOB_SECKEY_SSH))
-// 		.arg("--recipient_pk")
-// 		.arg(&strip_prefix(ALICE_PUBKEY_SSH))
-// 		.pipe_in(&temp_file("random.10MB"))
-// 		.pipe_out(&temp_file("random.10MB.c4gh"))
-// 		.succeeds();
-
-// 	// Decrypt
-// 	CommandUnderTest::new()
-// 		.env("C4GH_PASSPHRASE", ALICE_PASSPHRASE)
-// 		.arg("decrypt")
-// 		.arg("--sk")
-// 		.arg(&strip_prefix(ALICE_SECKEY_SSH))
-// 		.pipe_in(&temp_file("random.10MB.c4gh"))
-// 		.pipe_out(&temp_file("random.10MB.received"))
-// 		.succeeds();
-
-// 	// Compare
-// 	equal(&temp_file("random.10MB"), &temp_file("random.10MB.received"));
-
-// 	// Cleanup
-// 	drop(init);
-
-// 	Ok(())
-// }

@@ -211,90 +211,6 @@ impl Default for Cleanup {
 	}
 }
 
-pub fn equal(file1: &str, file2: &str) {
-	let status = Command::new("diff")
-		.arg(file1)
-		.arg(file2)
-		.stderr(Stdio::null())
-		.stdout(Stdio::null())
-		.spawn()
-		.unwrap()
-		.wait()
-		.unwrap()
-		.code()
-		.unwrap();
-	assert_eq!(status, 0);
-}
-
-pub fn new_random_file(filename: &str, size_in_mb: usize) {
-	File::create(filename).unwrap();
-	let status = Command::new("dd")
-		.arg("if=/dev/urandom")
-		.arg("bs=1048576")
-		.arg(format!("count={}", size_in_mb))
-		.arg(format!("of={}", filename))
-		.stderr(Stdio::null())
-		.spawn()
-		.unwrap()
-		.wait()
-		.unwrap()
-		.code()
-		.unwrap();
-	assert_eq!(status, 0);
-}
-
-pub fn remove_file(file_pattern: &str) {
-	Command::new(r#"rm"#)
-		.arg("-rf")
-		.arg(file_pattern)
-		.spawn()
-		.unwrap()
-		.wait()
-		.ok();
-}
-
-#[must_use]
-pub fn temp_file(filename: &str) -> String {
-	let mut s = TEMP_LOCATION.to_string();
-	s.push('/');
-	s.push_str(filename);
-	s
-}
-
-#[must_use]
-pub fn strip_prefix(filename: &str) -> String {
-	let ref_file = PathBuf::from(temp_file(filename));
-	let ref_file = ref_file.strip_prefix("tests/").unwrap();
-	ref_file.to_str().unwrap().to_string()
-}
-
-#[must_use]
-pub fn add_prefix(filename: &str) -> String {
-	let mut ref_file = PathBuf::new();
-	ref_file.push("tests/");
-	ref_file.push(filename);
-	ref_file.to_str().unwrap().to_string()
-}
-
-pub fn ssh_gen(secret_filepath: &str, passphrase: &str) {
-	let status = Command::new("ssh-keygen")
-		.arg("-t")
-		.arg("ed25519")
-		.arg("-f")
-		.arg(secret_filepath)
-		.arg("-N")
-		.arg(passphrase)
-		.stderr(Stdio::null())
-		.stdout(Stdio::null())
-		.spawn()
-		.unwrap()
-		.wait()
-		.unwrap()
-		.code()
-		.unwrap();
-	assert_eq!(status, 0);
-}
-
 pub fn echo(message: &str, filename: &str) {
 	let file = File::create(filename).unwrap();
 	let status = Command::new("echo")
@@ -337,19 +253,4 @@ pub fn count_characters(filepath: &str, assert_size: usize) {
 	assert!(result.status.success());
 	let out = String::from_utf8(result.stdout).unwrap();
 	assert_eq!(out.trim().parse::<usize>().unwrap(), assert_size);
-}
-
-pub fn grep(filepath: &str, substring: &str) {
-	let status = Command::new("grep")
-		.arg("-v")
-		.arg(substring)
-		.arg(filepath)
-		.stderr(Stdio::null())
-		.spawn()
-		.unwrap()
-		.wait()
-		.unwrap()
-		.code()
-		.unwrap();
-	assert_eq!(status, 1);
 }
