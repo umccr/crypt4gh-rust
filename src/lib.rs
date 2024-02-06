@@ -21,6 +21,9 @@
 	clippy::redundant_else
 )]
 
+use bytes::Bytes;
+use io::Cursor;
+use keys::SessionKeys;
 use rand::{SeedableRng, RngCore, Rng};
 use rand_chacha;
 
@@ -88,28 +91,17 @@ impl<'a, W: Write> WriteInfo<'a, W> {
 	}
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-/// Key information.
-pub struct Keys {
-	/// Method used for the key encryption.
-	/// > Only method 0 is supported.
-	pub method: u8,
-	/// Secret key of the encryptor / decryptor (your key).
-	pub privkey: Vec<u8>,
-	/// Public key of the recipient (the key you want to encrypt for).
-	pub recipient_pubkey: Vec<u8>,
-}
-
 /// Reads from the `read_buffer` and writes the encrypted data to `write_buffer`.
 ///
 /// Reads from the `read_buffer` and writes the encrypted data (for every `recipient_key`) to `write_buffer`.
 /// If the range is specified, it will only encrypt the bytes from `range_start` to `range_start` + `range_span`.
 /// In case that `range_span` is none, it will encrypt from `range_start` to the end of the input.
 pub fn encrypt<R: Read, W: Write>(
-	recipient_keys: &HashSet<Keys>,
+	data_block: Bytes,
+	recipient_keys: &HashSet<keys::Keys>,
 	range_start: usize,
 	range_span: Option<usize>,
-) -> Result<(), Crypt4GHError> {
+) -> Result<EncryptedDataBlock, Crypt4GHError> {
 	if recipient_keys.is_empty() {
 		return Err(Crypt4GHError::NoRecipients);
 	}
@@ -225,8 +217,8 @@ pub fn encrypt<R: Read, W: Write>(
 ///
 /// Returns the encrypted header bytes
 pub fn encrypt_header(
-	recipient_keys: &HashSet<Keys>,
-	session_key: &Option<[u8; 32]>,
+	recipient_keys: &HashSet<keys::Keys>,
+	session_key: SessionKeys,
 ) -> Result<Vec<u8>, Crypt4GHError> {
 	let encryption_method = 0;
 	
@@ -254,88 +246,49 @@ pub fn encrypt_segment(data: &[u8], nonce: Nonce, key: &Key) -> Result<Vec<u8>, 
 	Ok(vec![nonce.to_vec(), ciphertext].concat())
 }
 
-/// Reads from the `read_buffer` and writes the decrypted data to `write_buffer`.
-///
-/// Reads from the `read_buffer` and writes the decrypted data to `write_buffer`.
-/// If the range is specified, it will only encrypt the bytes from `range_start` to `range_start` + `range_span`.
-/// In case that `range_span` is none, it will encrypt from `range_start` to the end of the input.
-/// If `sender_pubkey` is specified the program will check that the `recipient_key` in the message
-/// is the same as the `sender_pubkey`.
 pub fn decrypt(
-	payload: &[u8],
-	keys: &[Keys],
-	range_start: usize,
-	range_span: Option<usize>,
-	sender_pubkey: &Option<Vec<u8>>,
-) -> Result<Vec<u8>, Crypt4GHError> {
-	range_span.map_or_else(
-		|| {
-			log::info!("Decrypting file | Range: [{}, EOF)", range_start);
-		},
-		|span| {
-			log::info!("Decrypting file | Range: [{}, {})", range_start, range_start + span + 1);
-		},
-	);
+    data_block: Bytes,
+    session_keys: SessionKeys,
+    edit_list_packet: Option<Vec<u64>>,
+  ) -> Result<DecryptedDataBlock> {
+    let size = data_block.len();
 
-	// Get header info
-	let header = payload.get(0..16);
-	let header_info = header::deconstruct_header_info(header)?;
+    let read_buf = Cursor::new(data_block.to_vec());
+    let mut write_buf = Cursor::new(vec![]);
+    let mut write_info = WriteInfo::new(0, None, &mut write_buf);
 
-	// Calculate header packets
-	let encrypted_packets = (0..header_info.packets_count)
-		.map(|_| {
-			// Get length
-			let mut length_buffer = [0_u8; 4];
-			read_buffer
-				.read_exact(&mut length_buffer)
-				.map_err(|e| Crypt4GHError::ReadHeaderPacketLengthError(e.into()))?;
-			let length = bincode::deserialize::<u32>(&length_buffer)
-				.map_err(|e| Crypt4GHError::ParseHeaderPacketLengthError(e))?;
-			let length = length - 4;
+    // Todo crypt4gh-rust body_decrypt_parts does not work properly, so just apply edit list here.
+    body_decrypt(read_buf, session_keys.as_slice(), &mut write_info, 0)
+      .map_err(|err| Crypt4GHError(err.to_string()))?;
+    let mut decrypted_bytes: Bytes = write_buf.into_inner().into();
+    let mut edited_bytes = Bytes::new();
 
-			// Get data
-			let mut encrypted_data = vec![0_u8; length as usize];
-			read_buffer
-				.read_exact(&mut encrypted_data)
-				.map_err(|e| Crypt4GHError::ReadHeaderPacketDataError(e.into()))?;
-			Ok(encrypted_data)
-		})
-		.collect::<Result<Vec<Vec<u8>>, Crypt4GHError>>()?;
+    let edits = DecrypterStream::<()>::create_internal_edit_list(edit_list_packet)
+      .unwrap_or(vec![(false, decrypted_bytes.len() as u64)]);
+    if edits.iter().map(|(_, edit)| edit).sum::<u64>() > decrypted_bytes.len() as u64 {
+      return Err(Crypt4GHError(
+        "invalid edit lists for the decrypted data block".to_string(),
+      ));
+    }
 
-	let DecryptedHeaderPackets {
-		data_enc_packets: session_keys,
-		edit_list_packet: edit_list,
-	} = header::deconstruct_header_body(encrypted_packets, keys, sender_pubkey)?;
+    edits.into_iter().for_each(|(discarding, edit)| {
+      if !discarding {
+        let edit = decrypted_bytes.slice(0..edit as usize);
+        edited_bytes = [edited_bytes.clone(), edit].concat().into();
+      }
 
-	range_span.map_or_else(
-		|| {
-			log::info!("Slicing from {} | Keeping all bytes", range_start);
-		},
-		|span| {
-			log::info!("Slicing from {} | Keeping {} bytes", range_start, span);
-		},
-	);
+      decrypted_bytes = decrypted_bytes.slice(edit as usize..);
+    });
 
-	if range_span.is_some() && range_span.unwrap() == 0 {
-		return Err(Crypt4GHError::InvalidRangeSpan(range_span));
-	}
-
-	let mut write_info = WriteInfo::new(range_start, range_span, write_buffer);
-
-	// TODO: Might fail here on Some() due to read_buffer coming from io::stdin is not populated? See run_decrypt() in bin.rs or
-	// the appropriate test
-	match edit_list {
-		None => body_decrypt(read_buffer, &session_keys, &mut write_info, range_start)?,
-		Some(edit_list_content) => body_decrypt_parts(read_buffer, session_keys, write_info, edit_list_content)?,
-	}
-
-	log::info!("Decryption Over");
-	Ok(())
+    Ok(DecryptedDataBlock::new(
+      DecryptedBytes::new(edited_bytes),
+      size,
+    ))
 }
 
 struct DecryptedBuffer<'a, W: Write> {
 	read_buffer: &'a mut dyn Read,
-	session_keys: Vec<Vec<u8>>,
+	session_keys: keys::SessionKeys,
 	buf: Vec<u8>,
 	is_decrypted: bool,
 	block: u64,
@@ -344,7 +297,7 @@ struct DecryptedBuffer<'a, W: Write> {
 }
 
 impl<'a, W: Write> DecryptedBuffer<'a, W> {
-	fn new(read_buffer: &'a mut impl Read, session_keys: Vec<Vec<u8>>, output: WriteInfo<'a, W>) -> Result<Self, Crypt4GHError> {
+	fn new(read_buffer: &'a mut impl Read, session_keys: keys::SessionKeys, output: WriteInfo<'a, W>) -> Result<Self, Crypt4GHError> {
 		let mut decryptor = Self {
 			read_buffer,
 			session_keys,
@@ -655,7 +608,7 @@ pub fn reencrypt<R: Read, W: Write>(
 /// If the range is specified, it will only rearrange the bytes from `range_start` to `range_start` + `range_span`.
 /// In case that `range_span` is none, it will rearrange from `range_start` to the end of the input.
 pub fn rearrange<R: Read, W: Write>(
-	keys: Vec<Keys>,
+	keys: Vec<keys::Keys>,
 	read_buffer: &mut R,
 	write_buffer: &mut W,
 	range_start: usize,

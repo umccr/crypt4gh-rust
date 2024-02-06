@@ -331,8 +331,8 @@ pub fn deconstruct_header_body(
 /// Deserializes the data info from the header bytes.
 ///
 /// Reads the magic number, the version and the number of packets from the bytes.
-pub fn deconstruct_header_info(
-	header_info_file: Option<&[u8; 16]>, // TODO: HeaderInfo::len()
+pub fn deserialize_header_info(
+	header_info_file: , // TODO: HeaderInfo::len()
 ) -> Result<HeaderInfo, Crypt4GHError> {
 	let header_info =
 		bincode::deserialize::<HeaderInfo>(header_info_file.unwrap()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
