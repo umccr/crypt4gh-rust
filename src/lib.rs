@@ -30,20 +30,19 @@ use rand_chacha;
 use std::collections::HashSet;
 use std::io::{self, Read, Write};
 
-use header::DecryptedHeaderPackets;
-
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{ self, ChaCha20Poly1305, Key, KeyInit, Nonce };
 
 use crate::error::Crypt4GHError;
 
-/// Generate and parse a `Crypt4GH` header.
+pub mod decoder;
+pub mod decrypter;
+//pub mod encrypter;
+pub mod edit_lists;
+pub mod reader;
+pub mod util;
 pub mod header;
-
-/// Utility to read Crypt4GH-formatted keys.
 pub mod keys;
-
-/// `Crypt4GH` Errors.
 pub mod error;
 
 const CHUNK_SIZE: usize = 4096;

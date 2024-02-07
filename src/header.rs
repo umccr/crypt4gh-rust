@@ -29,6 +29,38 @@ struct HeaderPackets {
 	edit_list_packet: Option<Vec<u8>>,
 }
 
+/// Represents the encrypted header packet data, and the total size of all the header packets.
+#[derive(Debug, Default)]
+pub struct EncryptedHeaderPackets {
+  header_packets: Vec<EncryptedHeaderPacketBytes>,
+  header_length: u64,
+}
+
+impl EncryptedHeaderPackets {
+  /// Create a new decrypted data block.
+  pub fn new(header_packets: Vec<EncryptedHeaderPacketBytes>, size: u64) -> Self {
+    Self {
+      header_packets,
+      header_length: size,
+    }
+  }
+
+  /// Get the header packet bytes
+  pub fn header_packets(&self) -> &Vec<EncryptedHeaderPacketBytes> {
+    &self.header_packets
+  }
+
+  /// Get the size of all the packets.
+  pub fn header_length(&self) -> u64 {
+    self.header_length
+  }
+
+  /// Get the inner bytes and size.
+  pub fn into_inner(self) -> (Vec<EncryptedHeaderPacketBytes>, u64) {
+    (self.header_packets, self.header_length)
+  }
+}
+
 /// Contains the parsed data of the packets
 pub struct DecryptedHeaderPackets {
 	/// The packets that are coded as data

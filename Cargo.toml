@@ -46,6 +46,7 @@ ed25519_to_curve25519 = "0.2"
 curve25519-dalek = "4"
 ssh-key = { version = "0.6.4", features = ["ed25519"] }
 bytes = "1.5.0"
+rustls = "0.22"
 
 [dev-dependencies]
 testresult = "0.3"
