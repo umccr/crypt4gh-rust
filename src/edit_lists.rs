@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
-use crypt4gh::header::{encrypt, make_packet_data_edit_list, HeaderInfo};
-use crypt4gh::Keys;
+use crate::header::{encrypt, make_packet_data_edit_list, HeaderInfo};
+use crate::keys::Keys;
 use rustls::PrivateKey;
 use tokio::io::AsyncRead;
 
 use crate::error::{Error, Result};
 use crate::reader::Reader;
-use crate::PublicKey;
+use crate::keys::PublicKey;
 
 /// Unencrypted byte range positions. Contains inclusive start values and exclusive end values.
 #[derive(Debug, Clone)]
@@ -243,8 +243,8 @@ where
 
 #[cfg(test)]
 mod tests {
-  use htsget_test::crypt4gh::{get_decryption_keys, get_encryption_keys};
-  use htsget_test::http_tests::get_test_file;
+  // use htsget_test::crypt4gh::{get_decryption_keys, get_encryption_keys};
+  // use htsget_test::http_tests::get_test_file;
 
   use crate::reader::builder::Builder;
 

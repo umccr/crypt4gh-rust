@@ -3,14 +3,14 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use crypt4gh::header::{deconstruct_header_body, DecryptedHeaderPackets};
-use crypt4gh::Keys;
+use crate::header::{deserialize_header_info, DecryptedHeaderPackets};
+use crate::Keys;
 use pin_project_lite::pin_project;
 use tokio::task::{spawn_blocking, JoinHandle};
 
 use crate::error::Error::JoinHandleError;
 use crate::error::Result;
-use crate::PublicKey;
+use crate::keys::PublicKey;
 
 pin_project! {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -38,7 +38,7 @@ impl HeaderPacketsDecrypter {
     keys: Vec<Keys>,
     sender_pubkey: Option<PublicKey>,
   ) -> Result<DecryptedHeaderPackets> {
-    Ok(deconstruct_header_body(
+    Ok(deserialize_header_info(
       header_packets
         .into_iter()
         .map(|bytes| bytes.to_vec())

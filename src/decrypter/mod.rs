@@ -1,21 +1,18 @@
 use std::cmp::min;
-use std::future::Future;
 use std::io;
 use std::io::SeekFrom;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use async_trait::async_trait;
 use bytes::Bytes;
-use crypt4gh::header::HeaderInfo;
-use crypt4gh::Keys;
+use crate::header::HeaderInfo;
+use crate::Keys;
 use futures::ready;
 use futures::Stream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt};
 use tokio_util::codec::FramedRead;
 
-use crate::advance::Advance;
 use crate::decoder::Block;
 use crate::decoder::DecodedBlock;
 use crate::decrypter::data_block::DataBlockDecrypter;
@@ -411,54 +408,17 @@ where
   }
 }
 
-#[async_trait]
-impl<R> Advance for DecrypterStream<R>
-where
-  R: AsyncRead + Send + Unpin,
-{
-  async fn advance_encrypted(&mut self, position: u64) -> io::Result<u64> {
-    // Make sure that session keys are polled.
-    self.read_header().await?;
-
-    // Get the next position.
-    let data_block_position = self
-      .clamp_position(position)
-      .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "could not find data block position"))?;
-
-    Ok(data_block_position)
-  }
-
-  async fn advance_unencrypted(&mut self, position: u64) -> io::Result<u64> {
-    // Make sure that session keys are polled.
-    self.read_header().await?;
-
-    // Convert to an encrypted position and seek
-    let position = self
-      .to_encrypted(position)
-      .ok_or_else(|| Crypt4GHError("Unable to convert to encrypted position.".to_string()))?;
-
-    // Then do the advance.
-    self.advance_encrypted(position).await
-  }
-
-  fn stream_length(&self) -> Option<u64> {
-    self.stream_length
-  }
-}
-
+// FIXME: Test suite highly dependent on fs and File(s), migrate to Bytes and/or Streams instead
 #[cfg(test)]
 mod tests {
   use bytes::BytesMut;
   use futures_util::future::join_all;
   use futures_util::StreamExt;
-  use tokio::fs::File;
-
-  use htsget_test::http_tests::get_test_file;
+  // use tokio::fs::File;
 
   use crate::decoder::tests::assert_last_data_block;
   use crate::decrypter::builder::Builder;
-  use crate::tests::get_original_file;
-  use htsget_test::crypt4gh::get_decryption_keys;
+  // use crate::tests::get_original_file;
 
   use super::*;
 

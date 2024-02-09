@@ -21,10 +21,20 @@
 	clippy::redundant_else
 )]
 
+pub mod decoder;
+pub mod decrypter;
+//pub mod encrypter;
+pub mod edit_lists;
+pub mod reader;
+pub mod util;
+pub mod header;
+pub mod keys;
+pub mod error;
+
 use bytes::Bytes;
 use io::Cursor;
 use keys::SessionKeys;
-use rand::{SeedableRng, RngCore, Rng};
+use rand::{SeedableRng, RngCore};
 use rand_chacha;
 
 use std::collections::HashSet;
@@ -35,15 +45,8 @@ use chacha20poly1305::{ self, ChaCha20Poly1305, Key, KeyInit, Nonce };
 
 use crate::error::Crypt4GHError;
 
-pub mod decoder;
-pub mod decrypter;
-//pub mod encrypter;
-pub mod edit_lists;
-pub mod reader;
-pub mod util;
-pub mod header;
-pub mod keys;
-pub mod error;
+use decrypter::data_block::{ DecryptedDataBlock, DecryptedBytes };
+use keys::Keys;
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -90,127 +93,122 @@ impl<'a, W: Write> WriteInfo<'a, W> {
 	}
 }
 
-/// Reads from the `read_buffer` and writes the encrypted data to `write_buffer`.
-///
-/// Reads from the `read_buffer` and writes the encrypted data (for every `recipient_key`) to `write_buffer`.
-/// If the range is specified, it will only encrypt the bytes from `range_start` to `range_start` + `range_span`.
-/// In case that `range_span` is none, it will encrypt from `range_start` to the end of the input.
-pub fn encrypt<R: Read, W: Write>(
-	data_block: Bytes,
-	recipient_keys: &HashSet<keys::Keys>,
-	range_start: usize,
-	range_span: Option<usize>,
-) -> Result<EncryptedDataBlock, Crypt4GHError> {
-	if recipient_keys.is_empty() {
-		return Err(Crypt4GHError::NoRecipients);
-	}
+// pub fn encrypt<R: Read, W: Write>(
+// 	data_block: Bytes,
+// 	recipient_keys: &HashSet<keys::Keys>,
+// 	range_start: usize,
+// 	range_span: Option<usize>,
+// ) -> Result<EncryptedDataBlock, Crypt4GHError> {
+// 	if recipient_keys.is_empty() {
+// 		return Err(Crypt4GHError::NoRecipients);
+// 	}
 
-	log::info!("Encrypting the file");
-	log::debug!("    Start Coordinate: {}", range_start);
+// 	log::info!("Encrypting the file");
+// 	log::debug!("    Start Coordinate: {}", range_start);
 
-	// Seek
-	if range_start > 0 {
-		log::info!("Forwarding to position: {}", range_start);
-	}
+// 	// Seek
+// 	if range_start > 0 {
+// 		log::info!("Forwarding to position: {}", range_start);
+// 	}
 
-	// read_buffer
-	// 	.by_ref()
-	// 	.take(range_start as u64)
-	// 	.read_to_end(&mut Vec::new())
-	// 	.map_err(|e| Crypt4GHError::NotEnoughInput(range_start, e.into()))?;
+// 	// read_buffer
+// 	// 	.by_ref()
+// 	// 	.take(range_start as u64)
+// 	// 	.read_to_end(&mut Vec::new())
+// 	// 	.map_err(|e| Crypt4GHError::NotEnoughInput(range_start, e.into()))?;
 
-	log::debug!("    Span: {:?}", range_span);
+// 	log::debug!("    Span: {:?}", range_span);
 
-	log::info!("Creating Crypt4GH header");
+// 	log::info!("Creating Crypt4GH header");
 
-	let mut session_key = [0_u8; 32];
-	let mut rnd = rand_chacha::ChaCha20Rng::from_entropy();
+// 	let mut session_key = [0_u8; 32];
+// 	let mut rnd = rand_chacha::ChaCha20Rng::from_entropy();
 	
-	// random bytes into session_key
-	rnd.try_fill_bytes(&mut session_key).map_err(|_| Crypt4GHError::NoRandomNonce)?;
+// 	// random bytes into session_key
+// 	rnd.try_fill_bytes(&mut session_key).map_err(|_| Crypt4GHError::NoRandomNonce)?;
 	
-	let header_bytes = encrypt_header(recipient_keys, &Some(session_key))?;
+// 	let header_bytes = encrypt_header(recipient_keys, &Some(session_key))?;
 
-	log::debug!("header length: {}", header_bytes.len());
+// 	log::debug!("header length: {}", header_bytes.len());
 
-	write_buffer.write_all(&header_bytes)?;
+// 	write_buffer.write_all(&header_bytes)?;
 
-	log::info!("Streaming content");
+// 	log::info!("Streaming content");
 
-	let mut segment = [0_u8; SEGMENT_SIZE];
+// 	let mut segment = [0_u8; SEGMENT_SIZE];
 
-	let mut rnd = rand_chacha::ChaCha20Rng::from_entropy();
-	let mut nonce_bytes = [0u8; 12];
-	rnd.fill(&mut nonce_bytes);
+// 	let mut rnd = rand_chacha::ChaCha20Rng::from_entropy();
+// 	let mut nonce_bytes = [0u8; 12];
+// 	rnd.fill(&mut nonce_bytes);
 
-	// The whole file
-	match range_span {
-		None | Some(0) => loop {
-			let segment_len = read_buffer.read(&mut segment)?;
-			if segment_len == 0 {
-				break;
-			}
-			else if segment_len < SEGMENT_SIZE {
-				let (data, _) = segment.split_at(segment_len);
-				let nonce = Nonce::from_slice(&nonce_bytes);
-					//.map_err(|_| Crypt4GHError::NoRandomNonce)?;
-				let key = Key::from_slice(&session_key);
-				//.ok_or(Crypt4GHError::NoKey)?;
-				let encrypted_data = encrypt_segment(data, *nonce, &key)?;
-				write_buffer.write_all(&encrypted_data)?;
-				break;
-			}
-			else {
-				let nonce = Nonce::from_slice(&nonce_bytes);
-					//.ok_or(Crypt4GHError::NoRandomNonce)?;
-				let key = Key::from_slice(&session_key);//.ok_or(Crypt4GHError::NoKey)?;
-				let encrypted_data = encrypt_segment(&segment, *nonce, &key)?;
-				write_buffer.write_all(&encrypted_data)?;
-			}
-		},
-		Some(mut remaining_length) => {
-			while remaining_length > 0 {
-				let segment_len = read_buffer.read(&mut segment)?;
+// 	// The whole file
+// 	match range_span {
+// 		None | Some(0) => loop {
+// 			let segment_len = read_buffer.read(&mut segment)?;
+// 			if segment_len == 0 {
+// 				break;
+// 			}
+// 			else if segment_len < SEGMENT_SIZE {
+// 				let (data, _) = segment.split_at(segment_len);
+// 				let nonce = Nonce::from_slice(&nonce_bytes);
+// 					//.map_err(|_| Crypt4GHError::NoRandomNonce)?;
+// 				let key = Key::from_slice(&session_key);
+// 				//.ok_or(Crypt4GHError::NoKey)?;
+// 				let encrypted_data = encrypt_segment(data, *nonce, &key)?;
+// 				write_buffer.write_all(&encrypted_data)?;
+// 				break;
+// 			}
+// 			else {
+// 				let nonce = Nonce::from_slice(&nonce_bytes);
+// 					//.ok_or(Crypt4GHError::NoRandomNonce)?;
+// 				let key = Key::from_slice(&session_key);//.ok_or(Crypt4GHError::NoKey)?;
+// 				let encrypted_data = encrypt_segment(&segment, *nonce, &key)?;
+// 				write_buffer.write_all(&encrypted_data)?;
+// 			}
+// 		},
+// 		Some(mut remaining_length) => {
+// 			while remaining_length > 0 {
+// 				let segment_len = read_buffer.read(&mut segment)?;
 
-				// Stop
-				if segment_len >= remaining_length {
-					let (data, _) = segment.split_at(remaining_length);
-					let nonce = Nonce::from_slice(&nonce_bytes);
-						//.ok_or(Crypt4GHError::NoRandomNonce)?;
-					let key = Key::from_slice(&session_key);
-					//.ok_or(Crypt4GHError::NoKey)?;
-					let encrypted_data = encrypt_segment(data, *nonce, &key)?;
-					write_buffer.write_all(&encrypted_data)?;
-					break;
-				}
+// 				// Stop
+// 				if segment_len >= remaining_length {
+// 					let (data, _) = segment.split_at(remaining_length);
+// 					let nonce = Nonce::from_slice(&nonce_bytes);
+// 						//.ok_or(Crypt4GHError::NoRandomNonce)?;
+// 					let key = Key::from_slice(&session_key);
+// 					//.ok_or(Crypt4GHError::NoKey)?;
+// 					let encrypted_data = encrypt_segment(data, *nonce, &key)?;
+// 					write_buffer.write_all(&encrypted_data)?;
+// 					break;
+// 				}
 
-				// Not a full segment
-				if segment_len < SEGMENT_SIZE {
-					let (data, _) = segment.split_at(segment_len);
-					let nonce = Nonce::from_slice(&nonce_bytes);
-						//.ok_or(Crypt4GHError::NoRandomNonce)?;
-					let key = Key::from_slice(&session_key);
-					//.ok_or(Crypt4GHError::NoKey)?;
-					let encrypted_data = encrypt_segment(data, *nonce, &key)?;
-					write_buffer.write_all(&encrypted_data)?;
-					break;
-				}
+// 				// Not a full segment
+// 				if segment_len < SEGMENT_SIZE {
+// 					let (data, _) = segment.split_at(segment_len);
+// 					let nonce = Nonce::from_slice(&nonce_bytes);
+// 						//.ok_or(Crypt4GHError::NoRandomNonce)?;
+// 					let key = Key::from_slice(&session_key);
+// 					//.ok_or(Crypt4GHError::NoKey)?;
+// 					let encrypted_data = encrypt_segment(data, *nonce, &key)?;
+// 					write_buffer.write_all(&encrypted_data)?;
+// 					break;
+// 				}
 
-				let nonce = Nonce::from_slice(&nonce_bytes);
-					//.ok_or(Crypt4GHError::NoRandomNonce)?;
-				let key = Key::from_slice(&session_key);
-				//.ok_or(Crypt4GHError::NoKey)?;
-				let encrypted_data = encrypt_segment(&segment, *nonce, &key)?;
-				write_buffer.write_all(&encrypted_data)?;
+// 				let nonce = Nonce::from_slice(&nonce_bytes);
+// 					//.ok_or(Crypt4GHError::NoRandomNonce)?;
+// 				let key = Key::from_slice(&session_key);
+// 				//.ok_or(Crypt4GHError::NoKey)?;
+// 				let encrypted_data = encrypt_segment(&segment, *nonce, &key)?;
+// 				write_buffer.write_all(&encrypted_data)?;
 
-				remaining_length -= segment_len;
-			}
-		},
-	}
+// 				remaining_length -= segment_len;
+// 			}
+// 		},
+// 	}
 
-	log::info!("Encryption Successful");
-	Ok(())
-}
+// 	log::info!("Encryption Successful");
+// 	Ok(())
+// }
 
 /// Builds a header with a random session key
 ///
@@ -249,7 +247,7 @@ pub fn decrypt(
     data_block: Bytes,
     session_keys: SessionKeys,
     edit_list_packet: Option<Vec<u64>>,
-  ) -> Result<DecryptedDataBlock> {
+  ) -> Result<DecryptedDataBlock, Crypt4GHError> {
     let size = data_block.len();
 
     let read_buf = Cursor::new(data_block.to_vec());
@@ -556,7 +554,7 @@ pub fn reencrypt<R: Read, W: Write>(
 	read_buffer
 		.read_exact(&mut temp_buf)
 		.map_err(|e| Crypt4GHError::ReadHeaderError(e.into()))?;
-	let header_info: header::HeaderInfo = header::deconstruct_header_info(&temp_buf)?;
+	let header_info: header::HeaderInfo = header::deserialize_header_info(&temp_buf)?;
 
 	// Calculate header packets
 	let header_packets = (0..header_info.packets_count)
@@ -618,7 +616,7 @@ pub fn rearrange<R: Read, W: Write>(
 	read_buffer
 		.read_exact(&mut temp_buf)
 		.map_err(|e| Crypt4GHError::ReadHeaderError(e.into()))?;
-	let header_info: header::HeaderInfo = header::deconstruct_header_info(&temp_buf)?;
+	let header_info: header::HeaderInfo = header::deserialize_header_info(&temp_buf)?;
 
 	// Calculate header packets
 	let header_packets = (0..header_info.packets_count)

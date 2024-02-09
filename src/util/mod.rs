@@ -1,11 +1,10 @@
-use crypt4gh::keys::{generate_keys, get_private_key, get_public_key};
+//use crate::keys::{generate_keys, get_private_key, get_public_key};
 use rustls::PrivateKey;
 use std::cmp::min;
-use tempfile::TempDir;
 
 use crate::decoder::Block;
 use crate::error::{Error, Result};
-use crate::{KeyPair, PublicKey};
+use crate::keys::{KeyPair, PublicKey};
 
 fn to_current_data_block(pos: u64, header_len: u64) -> u64 {
   header_len + (pos / Block::encrypted_block_size()) * Block::standard_data_block_size()

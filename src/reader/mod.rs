@@ -3,7 +3,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
 
-use async_trait::async_trait;
 use crypt4gh::header::HeaderInfo;
 use crypt4gh::Keys;
 use futures::ready;
@@ -221,7 +220,6 @@ where
   }
 }
 
-#[async_trait]
 impl<R> Advance for Reader<R>
 where
   R: AsyncRead + Send + Unpin,

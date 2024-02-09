@@ -1,13 +1,13 @@
 use std::thread;
 
-use crypt4gh::Keys;
+use crate::keys::Keys;
 use futures_util::TryStreamExt;
 use tokio::io::{AsyncRead, AsyncSeek};
 
 use crate::decrypter::builder::Builder as DecrypterBuilder;
 use crate::decrypter::DecrypterStream;
 use crate::error::Result;
-use crate::PublicKey;
+use crate::keys::PublicKey;
 
 use super::Reader;
 
