@@ -47,6 +47,11 @@ curve25519-dalek = "4"
 ssh-key = { version = "0.6.4", features = ["ed25519"] }
 bytes = "1.5.0"
 rustls = "0.22"
+tokio = { version = "1", features = [ "io-util", "test-util", "macros", "rt-multi-thread" ] }
+futures = "0.3"
+pin-project-lite = "0.2.13"
+tokio-util = { version = "0.7", features = ["codec"] }
+futures-util = "0.3.30"
 
 [dev-dependencies]
 testresult = "0.3"
