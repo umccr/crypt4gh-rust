@@ -10,7 +10,7 @@ use pin_project_lite::pin_project;
 use tokio::task::JoinHandle;
 
 use crate::decrypter::DecrypterStream;
-use crate::error::Error::{Crypt4GHError, JoinHandleError};
+use crate::error::Crypt4GHError::{Crypt4GHError, JoinHandleError};
 use crate::error::Result;
 
 pin_project! {

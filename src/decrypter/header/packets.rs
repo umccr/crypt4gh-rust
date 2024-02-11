@@ -8,7 +8,7 @@ use crate::Keys;
 use pin_project_lite::pin_project;
 use tokio::task::{spawn_blocking, JoinHandle};
 
-use crate::error::Error::JoinHandleError;
+use crate::error::Crypt4GHError::JoinHandleError;
 use crate::error::Result;
 use crate::keys::PublicKey;
 

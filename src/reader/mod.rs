@@ -3,17 +3,16 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
 
-use crypt4gh::header::HeaderInfo;
-use crypt4gh::Keys;
+use crate::header::HeaderInfo;
+use crate::Keys;
 use futures::ready;
 use futures::stream::TryBuffered;
 use futures::Stream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, ReadBuf};
 
-use crate::advance::Advance;
 use crate::decoder::Block;
-use crate::error::Error::NumericConversionError;
+use crate::error::Crypt4GHError::NumericConversionError;
 use crate::error::Result;
 use crate::reader::builder::Builder;
 use crate::{DecryptedDataBlock, EncryptedHeaderPacketBytes};
@@ -217,31 +216,6 @@ where
     self.block_position = Some(position);
 
     Ok(position)
-  }
-}
-
-impl<R> Advance for Reader<R>
-where
-  R: AsyncRead + Send + Unpin,
-{
-  async fn advance_encrypted(&mut self, position: u64) -> io::Result<u64> {
-    let position = self.stream.get_mut().advance_encrypted(position).await?;
-
-    self.block_position = Some(position);
-
-    Ok(position)
-  }
-
-  async fn advance_unencrypted(&mut self, position: u64) -> io::Result<u64> {
-    let position = self.stream.get_mut().advance_unencrypted(position).await?;
-
-    self.block_position = Some(position);
-
-    Ok(position)
-  }
-
-  fn stream_length(&self) -> Option<u64> {
-    self.stream.get_ref().stream_length()
   }
 }
 

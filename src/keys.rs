@@ -1,38 +1,12 @@
 #![warn(missing_docs)]
 #![warn(rustdoc::missing_doc_code_examples)]
 
-use bytes::Bytes;
-use rustls::PrivateKey;
-
-use aes::cipher::{StreamCipher, generic_array::GenericArray};
+//use rustls::PrivateKey;
 
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Cursor, Read, Write, BufWriter};
-use std::path::PathBuf;
-
-use base64::engine::general_purpose;
-use base64::Engine;
+use std::io::Read;
 
 use lazy_static::lazy_static;
-
-use rand_chacha;
-use rand::{SeedableRng, RngCore, Rng};
-
-use crypto_kx::{Keypair, SecretKey};
-
-use aes::cipher::{KeyInit, KeyIvInit};
-use aes::cipher::consts::U48;
-use chacha20poly1305::aead::Aead;
-use chacha20poly1305::aead::OsRng;
-use chacha20poly1305::{self, ChaCha20Poly1305};
-
-use ctr;
-
-use curve25519_dalek::montgomery::MontgomeryPoint;
-use curve25519_dalek::traits::IsIdentity;
-
-use crate::error::Crypt4GHError;
 
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
 const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";

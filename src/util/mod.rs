@@ -3,7 +3,7 @@ use rustls::PrivateKey;
 use std::cmp::min;
 
 use crate::decoder::Block;
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::keys::{KeyPair, PublicKey};
 
 fn to_current_data_block(pos: u64, header_len: u64) -> u64 {

@@ -1,15 +1,14 @@
 use std::io;
 
 use bytes::{Bytes, BytesMut};
-use crypt4gh::header::{deconstruct_header_info, HeaderInfo};
+use crate::header::{deserialize_header_info, HeaderInfo};
 use tokio_util::codec::Decoder;
 
-use crate::error::Error::{
-  Crypt4GHError, DecodingHeaderInfo, MaximumHeaderSize, NumericConversionError,
-  SliceConversionError,
+use crate::error::Crypt4GHError::{
+  self, Crypt4GHError, DecodingHeaderInfo, MaximumHeaderSize, NumericConversionError, SliceConversionError
 };
-use crate::error::{Error, Result};
-use crate::{EncryptedHeaderPacketBytes, EncryptedHeaderPackets};
+use crate::error::Result;
+use crate::header::EncryptedHeaderPackets;
 
 pub const ENCRYPTED_BLOCK_SIZE: usize = 65536;
 pub const NONCE_SIZE: usize = 12; // ChaCha20 IETF Nonce size
@@ -132,7 +131,7 @@ impl Block {
         return Ok(None);
       }
 
-      header_packet_bytes.push(EncryptedHeaderPacketBytes::new(
+      header_packet_bytes.push(EncryptedHeaderPackets::new(
         length_bytes,
         src.split_to(length).freeze(),
       ));
@@ -210,7 +209,7 @@ impl Default for Block {
 
 impl Decoder for Block {
   type Item = DecodedBlock;
-  type Error = Error;
+  type Error = Crypt4GHError;
 
   fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>> {
     match self.next_block {
@@ -251,19 +250,13 @@ impl Decoder for Block {
 pub(crate) mod tests {
   use std::io::Cursor;
 
-  use crypt4gh::header::{deconstruct_header_body, DecryptedHeaderPackets};
-  use crypt4gh::{body_decrypt, Keys, WriteInfo};
+  use crate::header::{deconstruct_header_body, DecryptedHeaderPackets};
+  use crate::{body_decrypt, Keys, WriteInfo};
   use futures_util::stream::Skip;
   use futures_util::StreamExt;
-  use tokio::fs::File;
+  //use tokio::fs::File;
   use tokio::io::AsyncReadExt;
   use tokio_util::codec::FramedRead;
-
-  use htsget_test::crypt4gh::get_decryption_keys;
-  use htsget_test::http_tests::get_test_file;
-
-  use crate::tests::get_original_file;
-
   use super::*;
 
   #[tokio::test]

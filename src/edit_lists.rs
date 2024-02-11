@@ -5,7 +5,7 @@ use crate::keys::Keys;
 use rustls::PrivateKey;
 use tokio::io::AsyncRead;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::reader::Reader;
 use crate::keys::PublicKey;
 

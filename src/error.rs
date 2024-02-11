@@ -1,7 +1,13 @@
-use std::error::Error;
-use std::path::PathBuf;
+use std::{io, result};
 
 use thiserror::Error;
+use tokio::task;
+
+/// The result type for Crypt4GH errors.
+pub type Result<T> = result::Result<T, dyn std::error::Error>;
+use std::path::PathBuf;
+
+// FIXME: Merge both Error and Crypt4GHError into Crypt4GHError
 
 #[derive(Debug, Error)]
 pub enum Crypt4GHError {
@@ -154,53 +160,46 @@ pub enum Crypt4GHError {
 	#[error("Unable to parse the start of the range")]
 	ParseRangeError,
 
-	// // Config errors
-	// #[error("Unable to get environment variable '{0}' (ERROR = {1}) ")]
-	// NoEnvVar(&'static str, String),
-	// #[error("Wrong Port")]
-	// WrongPort,
-	// #[error("Bad config (ERROR = {0})")]
-	// BadConfig(String),
-
-	// // Binding errors
-	// #[error("Unable to bind to the address (ERROR = {0})")]
-	// BindingError(String),
-	// #[error("Unable to parse address: {0} (ERROR = {1})")]
-	// WrongAddress(String, String),
-
-	// // Runtime errors
-	// #[error("Internal Server Failed (ERROR = {0})")]
-	// InternalServerError(String),
-	// #[error("Page not found (ERROR = {0})")]
-	// NotFound(String),
-	// #[error("Database Failed (ERROR = {0})")]
-	// DbError(String),
-	// #[error("Cache Failed (ERROR = {0})")]
-	// CacheError(String),
-	// #[error("Invalid Headers")]
-	// InvalidHeaders,
-
-	// // Passport errors
-	// #[error("Unable to construct passport (ERROR = {0})")]
-	// BadPassport(String),
-
-	// // Authentication errors
-	// #[error("Unauthorized")]
-	// Unauthorized,
-	// #[error("Forbidden")]
-	// Forbidden,
-
-	// // AMQP
-	// #[error("Connection url bad format")]
-	// BadConfigConnectionUrl,
-	// #[error("AMQP TlsConnector builder failed")]
-	// TlsConnectorError,
-	// #[error("AMQP Connection failed")]
-	// ConnectionError(Option<amiquip::Error>),
-	// #[error("AMQP Error")]
-	// AMQPError(#[from] amiquip::Error),
-
 	// IO
 	#[error("IO failed")]
 	IoError(#[from] std::io::Error),
+	
+	// Conversion and decoding
+	#[error("converting slice to fixed size array")]
+	SliceConversionError,
+	#[error("converting between numeric types")]
+	NumericConversionError,
+	// #[error("decoding header info: `{0}`")]
+	// DecodingHeaderInfo(Crypt4GHError),
+	// #[error("decoding header packet: `{0}`")]
+	// DecodingHeaderPacket(Crypt4GHError),
+	#[error("join handle error: `{0}`")]
+	JoinHandleError(task::JoinError),
+	#[error("maximum header size exceeded")]
+	MaximumHeaderSize,
+	#[error("crypt4gh error: `{0}`")]
+	Crypt4GHError(String),
 }
+
+impl From<io::Error> for Crypt4GHError {
+  fn from(error: io::Error) -> Self {
+    Self::IOError(error)
+  }
+}
+
+impl From<std::error::Error> for Crypt4GHError {
+  fn from(error: dyn std::error::Error) -> Self {
+    if let std::error::Error::IOError(error) = error {
+      error
+    } else {
+      Self::new(io::ErrorKind::Other, error)
+    }
+  }
+}
+
+impl From<Crypt4GHError> for Crypt4GHError {
+  fn from(error: Crypt4GHError) -> Self {
+    Self::Crypt4GHError(error.to_string())
+  }
+}
+

@@ -18,10 +18,9 @@ use crate::decoder::DecodedBlock;
 use crate::decrypter::data_block::DataBlockDecrypter;
 use crate::decrypter::header::packets::HeaderPacketsDecrypter;
 use crate::decrypter::header::SessionKeysFuture;
-use crate::error::Error::Crypt4GHError;
+use crate::error::Crypt4GHError::Crypt4GHError;
 use crate::error::Result;
-use crate::EncryptedHeaderPacketBytes;
-use crate::{util, PublicKey};
+use crate::{util, keys::PublicKey};
 
 pub mod builder;
 pub mod data_block;
