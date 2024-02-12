@@ -3,7 +3,6 @@ use tokio::io::{AsyncRead, AsyncSeek};
 use tokio_util::codec::FramedRead;
 
 use crate::decrypter::DecrypterStream;
-use crate::error::Result;
 use crate::keys::PublicKey;
 
 /// An decrypter reader builder.

@@ -18,8 +18,7 @@ use crate::decoder::DecodedBlock;
 use crate::decrypter::data_block::DataBlockDecrypter;
 use crate::decrypter::header::packets::HeaderPacketsDecrypter;
 use crate::decrypter::header::SessionKeysFuture;
-use crate::error::Crypt4GHError::Crypt4GHError;
-use crate::error::Result;
+use crate::error::Crypt4GHError::{self, Crypt4GHError};
 use crate::{util, keys::PublicKey};
 
 pub mod builder;
@@ -103,7 +102,7 @@ where
   pub fn poll_data_block(
     mut self: Pin<&mut Self>,
     data_block: Bytes,
-  ) -> Poll<Option<Result<DataBlockDecrypter>>> {
+  ) -> Poll<Option<Result<DataBlockDecrypter, Crypt4GHError>>> {
     let edit_list = self.as_mut().partition_edit_list(&data_block);
 
     let this = self.project();
@@ -116,7 +115,7 @@ where
   }
 
   /// Poll the stream until the header packets and session keys are processed.
-  pub fn poll_session_keys(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+  pub fn poll_session_keys(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Crypt4GHError>> {
     // Only execute this function if there are no session keys.
     if !self.session_keys.is_empty() {
       return Poll::Ready(Ok(()));
@@ -188,7 +187,7 @@ where
   }
 
   /// Convenience for calling [`poll_session_keys`] on [`Unpin`] types.
-  pub fn poll_session_keys_unpin(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>>
+  pub fn poll_session_keys_unpin(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Crypt4GHError>>
   where
     Self: Unpin,
   {
@@ -196,7 +195,7 @@ where
   }
 
   /// Poll the stream until the header has been read.
-  pub async fn read_header(&mut self) -> Result<()>
+  pub async fn read_header(&mut self) -> Result<(), Crypt4GHError>
   where
     R: Unpin,
   {
@@ -317,7 +316,7 @@ where
   ///
   /// This can take up to 3 seek calls. If the size of the underlying buffer changes, this function
   /// should be called again, otherwise data block positions may not be valid.
-  pub async fn recompute_stream_length(&mut self) -> Result<u64> {
+  pub async fn recompute_stream_length(&mut self) -> Result<u64, Crypt4GHError> {
     let inner = self.inner.get_mut();
 
     let position = inner.seek(SeekFrom::Current(0)).await?;
@@ -337,7 +336,7 @@ impl<R> Stream for DecrypterStream<R>
 where
   R: AsyncRead,
 {
-  type Item = Result<DataBlockDecrypter>;
+  type Item = Result<DataBlockDecrypter, Crypt4GHError>;
 
   fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
     // When polling, we first need to process enough data to get the session keys.

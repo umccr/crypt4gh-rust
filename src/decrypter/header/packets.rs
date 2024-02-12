@@ -8,15 +8,14 @@ use crate::Keys;
 use pin_project_lite::pin_project;
 use tokio::task::{spawn_blocking, JoinHandle};
 
-use crate::error::Crypt4GHError::JoinHandleError;
-use crate::error::Result;
+use crate::error::Crypt4GHError::{self, JoinHandleError};
 use crate::keys::PublicKey;
 
 pin_project! {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct HeaderPacketsDecrypter {
         #[pin]
-        handle: JoinHandle<Result<DecryptedHeaderPackets>>
+        handle: JoinHandle<Result<DecryptedHeaderPackets, Crypt4GHError>>
     }
 }
 
@@ -37,7 +36,7 @@ impl HeaderPacketsDecrypter {
     header_packets: Vec<Bytes>,
     keys: Vec<Keys>,
     sender_pubkey: Option<PublicKey>,
-  ) -> Result<DecryptedHeaderPackets> {
+  ) -> Result<DecryptedHeaderPackets, Crypt4GHError> {
     Ok(deserialize_header_info(
       header_packets
         .into_iter()
@@ -50,7 +49,7 @@ impl HeaderPacketsDecrypter {
 }
 
 impl Future for HeaderPacketsDecrypter {
-  type Output = Result<DecryptedHeaderPackets>;
+  type Output = Result<DecryptedHeaderPackets, Crypt4GHError>;
 
   fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     self.project().handle.poll(cx).map_err(JoinHandleError)?

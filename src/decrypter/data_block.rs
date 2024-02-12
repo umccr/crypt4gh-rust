@@ -10,14 +10,13 @@ use pin_project_lite::pin_project;
 use tokio::task::JoinHandle;
 
 use crate::decrypter::DecrypterStream;
-use crate::error::Crypt4GHError::{Crypt4GHError, JoinHandleError};
-use crate::error::Result;
+use crate::error::Crypt4GHError::{self, JoinHandleError};
 
 pin_project! {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DataBlockDecrypter {
         #[pin]
-        handle: JoinHandle<Result<DecryptedDataBlock>>
+        handle: JoinHandle<Result<DecryptedDataBlock, Crypt4GHError>>
     }
 }
 
@@ -125,7 +124,7 @@ impl DataBlockDecrypter {
     data_block: Bytes,
     session_keys: Vec<Vec<u8>>,
     edit_list_packet: Option<Vec<u64>>,
-  ) -> Result<DecryptedDataBlock> {
+  ) -> Result<DecryptedDataBlock, Crypt4GHError> {
     let size = data_block.len();
 
     let read_buf = Cursor::new(data_block.to_vec());
@@ -134,14 +133,14 @@ impl DataBlockDecrypter {
 
     // Todo crypt4gh-rust body_decrypt_parts does not work properly, so just apply edit list here.
     body_decrypt(read_buf, session_keys.as_slice(), &mut write_info, 0)
-      .map_err(|err| Crypt4GHError(err.to_string()))?;
+      .map_err(|err| Crypt4GHError::DecryptedDataBlock(err.to_string()))?;
     let mut decrypted_bytes: Bytes = write_buf.into_inner().into();
     let mut edited_bytes = Bytes::new();
 
     let edits = DecrypterStream::<()>::create_internal_edit_list(edit_list_packet)
       .unwrap_or(vec![(false, decrypted_bytes.len() as u64)]);
     if edits.iter().map(|(_, edit)| edit).sum::<u64>() > decrypted_bytes.len() as u64 {
-      return Err(Crypt4GHError(
+      return Err(Crypt4GHError::InvalidEditList(
         "invalid edit lists for the decrypted data block".to_string(),
       ));
     }
@@ -163,7 +162,7 @@ impl DataBlockDecrypter {
 }
 
 impl Future for DataBlockDecrypter {
-  type Output = Result<DecryptedDataBlock>;
+  type Output = Result<DecryptedDataBlock, Crypt4GHError>;
 
   fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     self.project().handle.poll(cx).map_err(JoinHandleError)?

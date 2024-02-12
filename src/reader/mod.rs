@@ -12,8 +12,7 @@ use pin_project_lite::pin_project;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, ReadBuf};
 
 use crate::decoder::Block;
-use crate::error::Crypt4GHError::NumericConversionError;
-use crate::error::Result;
+use crate::error::Crypt4GHError::{self, NumericConversionError};
 use crate::reader::builder::Builder;
 use crate::{DecryptedDataBlock, header::EncryptedHeaderPacketBytes};
 
@@ -104,7 +103,7 @@ where
   }
 
   /// Poll the reader until the header has been read.
-  pub async fn read_header(&mut self) -> Result<()>
+  pub async fn read_header(&mut self) -> Result<(), Crypt4GHError>
   where
     R: Unpin,
   {
@@ -229,7 +228,7 @@ mod tests {
   use tokio::io::AsyncReadExt;
 
   use crate::reader::builder::Builder;
-  use crate::PublicKey;
+  use crate::keys::PublicKey;
 
   #[tokio::test]
   async fn reader() {

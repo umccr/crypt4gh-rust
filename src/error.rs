@@ -1,15 +1,9 @@
-use std::{io, result};
+use std::error::Error;
 
-use thiserror::Error;
+use thiserror::Error as ThisError;
 use tokio::task;
 
-/// The result type for Crypt4GH errors.
-pub type Result<T> = result::Result<T, dyn std::error::Error>;
-use std::path::PathBuf;
-
-// FIXME: Merge both Error and Crypt4GHError into Crypt4GHError
-
-#[derive(Debug, Error)]
+#[derive(Debug, ThisError)]
 pub enum Crypt4GHError {
 	// User errors
 	#[error("No Recipients' Public Key found")]
@@ -18,7 +12,6 @@ pub enum Crypt4GHError {
 	InvalidRangeSpan(Option<usize>),
 	#[error("The edit list is empty")]
 	EmptyEditList,
-	// Sodiumoxide errors
 	#[error("Unable to create random nonce")]
 	NoRandomNonce,
 	#[error("Unable to extract nonce")]
@@ -33,8 +26,8 @@ pub enum Crypt4GHError {
 	// DecryptKeyError(SymmetricCipherError),
 	#[error("Invalid key format")]
 	InvalidKeyFormat,
-	#[error("Invalid PEM file length. The file ({0:?}) is not 3 lines long")]
-	InvalidPEMFormatLength(PathBuf),
+	#[error("Invalid PEM file length.")]
+	InvalidPEMFormatLength,
 	#[error("Invalid PEM file header or footer: -----BEGIN or -----END")]
 	InvalidPEMHeaderOrFooter,
 	#[error("Invalid SSH key format")]
@@ -62,7 +55,7 @@ pub enum Crypt4GHError {
 	#[error("Decryption failed -> Invalid data: {0}")]
 	InvalidData(String),
 
-	// Keys errors
+	// Key errors
 	#[error("Unable to extract public server key")]
 	BadServerPublicKey,
 	#[error("Unable to extract private server key")]
@@ -97,8 +90,8 @@ pub enum Crypt4GHError {
 	ReadBlockError(Box<dyn Error + Send + Sync>),
 	#[error("Error reading the remainder of the file (ERROR = {0:?})")]
 	ReadRemainderError(Box<dyn Error + Send + Sync>),
-	#[error("Unable to read lines from {0:?} (ERROR = {1:?})")]
-	ReadLinesError(PathBuf, Box<dyn Error + Send + Sync>),
+	// #[error("Unable to read lines from {0:?} (ERROR = {1:?})")]
+	// ReadLinesError(PathBuf, Box<dyn Error + Send + Sync>),
 	#[error("Unable to deserialize rounds from private key")]
 	ReadRoundsError,
 	#[error("Unable to extract public key")]
@@ -115,10 +108,8 @@ pub enum Crypt4GHError {
 	MagicStringError,
 	#[error("Unsupported CRYPT4GH version (version = {0:?})")]
 	InvalidCrypt4GHVersion(u32),
-	#[error("Empty public key at {0:?}")]
-	EmptyPublicKey(PathBuf),
-	#[error("Secret key not found: {0}")]
-	ReadSecretKeyFileError(PathBuf),
+	#[error("Empty public key")]
+	EmptyPublicKey,
 
 	// Packets
 	#[error("Unable to read packet encryption method")]
@@ -169,10 +160,10 @@ pub enum Crypt4GHError {
 	SliceConversionError,
 	#[error("converting between numeric types")]
 	NumericConversionError,
-	#[error("decoding header info: `{0}`")]
-	DecodingHeaderInfo(Crypt4GHError),
-	#[error("decoding header packet: `{0}`")]
-	DecodingHeaderPacket(Crypt4GHError),
+	#[error("Decoding header info error")]
+	DecodingHeaderInfo,
+	#[error("Decoding header packet error")]
+	DecodingHeaderPacket,
 	#[error("join handle error: `{0}`")]
 	JoinHandleError(task::JoinError),
 	#[error("maximum header size exceeded")]
@@ -181,25 +172,25 @@ pub enum Crypt4GHError {
 	Crypt4GHError(String),
 }
 
-impl From<io::Error> for Crypt4GHError {
-  fn from(error: io::Error) -> Self {
-    Self::IOError(error)
-  }
-}
+// impl From<io::Error> for Crypt4GHError {
+//   fn from(error: io::Error) -> Self {
+//     Self::IOError(error)
+//   }
+// }
 
-impl From<std::error::Error> for Crypt4GHError {
-  fn from(error: dyn std::error::Error) -> Self {
-    if let std::error::Error::IOError(error) = error {
-      error
-    } else {
-      Self::new(io::ErrorKind::Other, error)
-    }
-  }
-}
+// impl From<dyn Error> for Crypt4GHError {
+//   fn from(error: dyn std::error::Error) -> Self {
+//     if let std::error::Error::IOError(error) = error {
+//       error
+//     } else {
+//       Self::new(io::ErrorKind::Other, error)
+//     }
+//   }
+// }
 
-impl From<Crypt4GHError> for Crypt4GHError {
-  fn from(error: Crypt4GHError) -> Self {
-    Self::Crypt4GHError(error.to_string())
-  }
-}
+// impl From<dyn Error> for Crypt4GHError {
+//   fn from(error: Crypt4GHError) -> Self {
+//     Self::Crypt4GHError(error.to_string())
+//   }
+//}
 

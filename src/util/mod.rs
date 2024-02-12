@@ -3,7 +3,7 @@ use rustls::PrivateKey;
 use std::cmp::min;
 
 use crate::decoder::Block;
-use crate::error::Result;
+use crate::error::Crypt4GHError;
 use crate::keys::{KeyPair, PublicKey};
 
 fn to_current_data_block(pos: u64, header_len: u64) -> u64 {
@@ -89,9 +89,9 @@ pub fn unencrypted_clamp_next(pos: u64, encrypted_file_size: u64) -> u64 {
 }
 
 /// Generate a private and public key pair.
-pub fn generate_key_pair() -> Result<KeyPair> {
+pub fn generate_key_pair() -> Result<KeyPair, Crypt4GHError> {
   // Todo, very janky, avoid writing this to a file first.
-  let temp_dir = TempDir::new().map_err(|err| Error::Crypt4GHError(err.to_string()))?;
+  //let temp_dir = TempDir::new().map_err(|err| Crypt4GHError::NoTempFiles(err.to_string()))?;
 
   let private_key = temp_dir.path().join("private_key");
   let public_key = temp_dir.path().join("public_key");

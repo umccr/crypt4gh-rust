@@ -7,7 +7,6 @@ use tokio_util::codec::Decoder;
 use crate::error::Crypt4GHError::{
   self, DecodingHeaderInfo, MaximumHeaderSize, NumericConversionError, SliceConversionError
 };
-use crate::error::Result;
 use crate::header::EncryptedHeaderPackets;
 
 pub const ENCRYPTED_BLOCK_SIZE: usize = 65536;
@@ -62,7 +61,7 @@ pub struct Block {
 }
 
 impl Block {
-  fn get_header_info(src: &mut BytesMut) -> Result<HeaderInfo> {
+  fn get_header_info(src: &mut BytesMut) -> Result<HeaderInfo, Crypt4GHError> {
     deserialize_header_info(
       src
         .split_to(HEADER_INFO_SIZE)
@@ -77,7 +76,7 @@ impl Block {
   /// `decode` methods, this method parses the header info before returning a decoded block
   /// because the header info contains the number of packets which is required for decoding
   /// the rest of the source.
-  pub fn decode_header_info(&mut self, src: &mut BytesMut) -> Result<Option<DecodedBlock>> {
+  pub fn decode_header_info(&mut self, src: &mut BytesMut) -> Result<Option<DecodedBlock>, Crypt4GHError> {
     // Header info is a fixed size.
     if src.len() < HEADER_INFO_SIZE {
       src.reserve(HEADER_INFO_SIZE);
@@ -97,7 +96,7 @@ impl Block {
     &mut self,
     src: &mut BytesMut,
     header_packets: u32,
-  ) -> Result<Option<DecodedBlock>> {
+  ) -> Result<Option<DecodedBlock>, Crypt4GHError> {
     let mut header_packet_bytes = vec![];
     for _ in 0..header_packets {
       // Get enough bytes to read the header packet length.
@@ -153,7 +152,7 @@ impl Block {
   }
 
   /// Decodes data blocks, updates the state and returns a data block type.
-  pub fn decode_data_block(&mut self, src: &mut BytesMut) -> Result<Option<DecodedBlock>> {
+  pub fn decode_data_block(&mut self, src: &mut BytesMut) -> Result<Option<DecodedBlock>, Crypt4GHError> {
     // Data blocks are a fixed size, so we can return the
     // next data block without much processing.
     if src.len() < DATA_BLOCK_SIZE {
@@ -211,7 +210,7 @@ impl Decoder for Block {
   type Item = DecodedBlock;
   type Error = Crypt4GHError;
 
-  fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>> {
+  fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Crypt4GHError> {
     match self.next_block {
       BlockState::HeaderInfo => self.decode_header_info(src),
       BlockState::HeaderPackets(header_packets) => self.decode_header_packets(src, header_packets),
@@ -220,7 +219,7 @@ impl Decoder for Block {
     }
   }
 
-  fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>> {
+  fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Crypt4GHError> {
     // Need a custom implementation of decode_eof because the last data block can be shorter.
     match self.decode(buf)? {
       Some(frame) => Ok(Some(frame)),
