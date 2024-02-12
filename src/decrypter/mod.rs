@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use crate::header::HeaderInfo;
+use crate::header::{EncryptedHeaderPacketBytes, HeaderInfo};
 use crate::Keys;
 use futures::ready;
 use futures::Stream;

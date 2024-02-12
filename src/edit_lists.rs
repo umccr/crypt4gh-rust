@@ -5,7 +5,7 @@ use crate::keys::Keys;
 use rustls::PrivateKey;
 use tokio::io::AsyncRead;
 
-use crate::error::Result;
+use crate::error::{Crypt4GHError, Result};
 use crate::reader::Reader;
 use crate::keys::PublicKey;
 
@@ -134,7 +134,7 @@ where
     encrypt(&edit_list_packet, &HashSet::from_iter(vec![keys]))?
       .into_iter()
       .last()
-      .ok_or_else(|| Error::Crypt4GHError("could not encrypt header packet".to_string()))
+      .ok_or_else(|| Crypt4GHError::EditHeader("could not encrypt header packet".to_string()))
   }
 
   /// Create the edit lists from the unencrypted byte positions.
@@ -195,7 +195,7 @@ where
   /// Add edit lists and return a header packet.
   pub fn edit_list(self) -> Result<Option<Header>> {
     if self.reader.edit_list_packet().is_some() {
-      return Err(Error::Crypt4GHError("edit lists already exist".to_string()));
+      return Err(Crypt4GHError::InvalidEditList("edit lists already exist".to_string()));
     }
 
     // Todo, header info should have copy or clone on it.
@@ -222,7 +222,7 @@ where
     // Todo rewrite this from the context of an encryption stream like the decrypter.
     header_info.packets_count += 1;
     let header_info_bytes =
-      bincode::serialize(&header_info).map_err(|err| Error::Crypt4GHError(err.to_string()))?;
+      bincode::serialize(&header_info).map_err(|err| Crypt4GHError::ReadHeaderError(err.to_string()))?;
 
     let edit_list = self.create_edit_list();
     let edit_list_packet =

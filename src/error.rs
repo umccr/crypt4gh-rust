@@ -169,10 +169,10 @@ pub enum Crypt4GHError {
 	SliceConversionError,
 	#[error("converting between numeric types")]
 	NumericConversionError,
-	// #[error("decoding header info: `{0}`")]
-	// DecodingHeaderInfo(Crypt4GHError),
-	// #[error("decoding header packet: `{0}`")]
-	// DecodingHeaderPacket(Crypt4GHError),
+	#[error("decoding header info: `{0}`")]
+	DecodingHeaderInfo(Crypt4GHError),
+	#[error("decoding header packet: `{0}`")]
+	DecodingHeaderPacket(Crypt4GHError),
 	#[error("join handle error: `{0}`")]
 	JoinHandleError(task::JoinError),
 	#[error("maximum header size exceeded")]

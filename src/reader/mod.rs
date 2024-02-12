@@ -15,7 +15,7 @@ use crate::decoder::Block;
 use crate::error::Crypt4GHError::NumericConversionError;
 use crate::error::Result;
 use crate::reader::builder::Builder;
-use crate::{DecryptedDataBlock, EncryptedHeaderPacketBytes};
+use crate::{DecryptedDataBlock, header::EncryptedHeaderPacketBytes};
 
 use super::decrypter::DecrypterStream;
 
@@ -228,13 +228,8 @@ mod tests {
   use noodles::sam::Header;
   use tokio::io::AsyncReadExt;
 
-  use htsget_test::http_tests::get_test_file;
-
-  use crate::advance::Advance;
   use crate::reader::builder::Builder;
-  use crate::tests::get_original_file;
   use crate::PublicKey;
-  use htsget_test::crypt4gh::get_decryption_keys;
 
   #[tokio::test]
   async fn reader() {

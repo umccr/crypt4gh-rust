@@ -5,7 +5,7 @@ use crate::header::{deserialize_header_info, HeaderInfo};
 use tokio_util::codec::Decoder;
 
 use crate::error::Crypt4GHError::{
-  self, Crypt4GHError, DecodingHeaderInfo, MaximumHeaderSize, NumericConversionError, SliceConversionError
+  self, DecodingHeaderInfo, MaximumHeaderSize, NumericConversionError, SliceConversionError
 };
 use crate::error::Result;
 use crate::header::EncryptedHeaderPackets;
@@ -63,7 +63,7 @@ pub struct Block {
 
 impl Block {
   fn get_header_info(src: &mut BytesMut) -> Result<HeaderInfo> {
-    deconstruct_header_info(
+    deserialize_header_info(
       src
         .split_to(HEADER_INFO_SIZE)
         .as_ref()
@@ -234,7 +234,7 @@ impl Decoder for Block {
 
             Ok(Some(DecodedBlock::DataBlock(buf.split().freeze())))
           } else {
-            Err(Crypt4GHError(
+            Err(Crypt4GHError::UnableToDecryptBlock(self.next_block, 
               "the last data block is too large".to_string(),
             ))
           }

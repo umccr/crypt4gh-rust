@@ -24,9 +24,13 @@ enum HeaderPacketType {
 	EditList = 1,
 }
 
-struct HeaderPackets {
+pub struct HeaderPackets {
 	data_enc_packets: Vec<Vec<u8>>,
 	edit_list_packet: Option<Vec<u8>>,
+}
+
+pub struct EncryptedHeaderPacketBytes {
+	inner: Vec<u8>
 }
 
 /// Represents the encrypted header packet data, and the total size of all the header packets.
@@ -364,10 +368,10 @@ pub fn deconstruct_header_body(
 ///
 /// Reads the magic number, the version and the number of packets from the bytes.
 pub fn deserialize_header_info(
-	header_info_file: , // TODO: HeaderInfo::len()
+	header_info: HeaderInfo, // TODO: HeaderInfo::len()
 ) -> Result<HeaderInfo, Crypt4GHError> {
 	let header_info =
-		bincode::deserialize::<HeaderInfo>(header_info_file.unwrap()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
+		bincode::deserialize::<HeaderInfo>(header_info.unwrap()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
 
 	if &header_info.magic_number != MAGIC_NUMBER {
 		return Err(Crypt4GHError::MagicStringError);
