@@ -371,7 +371,7 @@ pub fn deserialize_header_info(
 	header_info: HeaderInfo, // TODO: HeaderInfo::len()
 ) -> Result<HeaderInfo, Crypt4GHError> {
 	let header_info =
-		bincode::deserialize::<HeaderInfo>(header_info.unwrap()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
+		bincode::deserialize::<HeaderInfo>(header_info).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
 
 	if &header_info.magic_number != MAGIC_NUMBER {
 		return Err(Crypt4GHError::MagicStringError);

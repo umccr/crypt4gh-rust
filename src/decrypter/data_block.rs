@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -133,16 +133,14 @@ impl DataBlockDecrypter {
 
     // Todo crypt4gh-rust body_decrypt_parts does not work properly, so just apply edit list here.
     body_decrypt(read_buf, session_keys.as_slice(), &mut write_info, 0)
-      .map_err(|err| Crypt4GHError::DecryptedDataBlock(err.to_string()))?;
+      .map_err(|err| Crypt4GHError::UnableToDecryptBlock(read_buf.into_inner(), err.to_string()))?;
     let mut decrypted_bytes: Bytes = write_buf.into_inner().into();
     let mut edited_bytes = Bytes::new();
 
     let edits = DecrypterStream::<()>::create_internal_edit_list(edit_list_packet)
       .unwrap_or(vec![(false, decrypted_bytes.len() as u64)]);
     if edits.iter().map(|(_, edit)| edit).sum::<u64>() > decrypted_bytes.len() as u64 {
-      return Err(Crypt4GHError::InvalidEditList(
-        "invalid edit lists for the decrypted data block".to_string(),
-      ));
+      return Err(Crypt4GHError::InvalidEditList);
     }
 
     edits.into_iter().for_each(|(discarding, edit)| {

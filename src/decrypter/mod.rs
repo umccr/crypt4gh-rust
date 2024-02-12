@@ -437,7 +437,7 @@ mod tests {
   }
 
   fn assert_edit_list(
-    stream: &mut DecrypterStream<File>,
+    stream: &mut DecrypterStream<File>, // FIXME: No files!
     expected: Option<Vec<u64>>,
     bytes: Vec<u8>,
   ) {

@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 use tokio::io::AsyncRead;
 
 use crate::decrypter::DecrypterStream;
-use crate::decrypter::Result;
+use crate::error::Crypt4GHError;
 
 pub mod packets;
 
@@ -33,7 +33,7 @@ impl<'a, R> Future for SessionKeysFuture<'a, R>
 where
   R: AsyncRead + Unpin,
 {
-  type Output = Result<()>;
+  type Output = Result<(), Crypt4GHError>;
 
   fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     self.handle.poll_session_keys_unpin(cx)

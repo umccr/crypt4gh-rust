@@ -1,3 +1,4 @@
+use crate::error::Crypt4GHError;
 use crate::keys::Keys;
 use tokio::io::{AsyncRead, AsyncSeek};
 use tokio_util::codec::FramedRead;
@@ -78,7 +79,7 @@ impl Builder {
     self,
     inner: R,
     keys: Vec<Keys>,
-  ) -> Result<DecrypterStream<R>>
+  ) -> Result<DecrypterStream<R>, Crypt4GHError>
   where
     R: AsyncRead + AsyncSeek + Unpin,
   {
