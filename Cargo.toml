@@ -55,6 +55,9 @@ futures-util = "0.3.30"
 
 [dev-dependencies]
 testresult = "0.3"
+noodles-bam = "0.55"
+noodles-sam = "0.52"
+noodles = { version = "0.63", features = [ "sam", "bam", "async" ] }
 
 [profile.release]
 lto = true
