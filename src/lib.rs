@@ -47,7 +47,8 @@ use chacha20poly1305::{ self, ChaCha20Poly1305, Key, KeyInit, Nonce };
 use crate::error::Crypt4GHError;
 
 use decrypter::data_block::{ DecryptedDataBlock, DecryptedBytes };
-use keys::Keys;
+use keys::KeyPairInfo;
+use header::{ HeaderInfo, deserialize_header_info };
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -215,7 +216,7 @@ impl<'a, W: Write> WriteInfo<'a, W> {
 ///
 /// Returns the encrypted header bytes
 pub fn encrypt_header(
-	recipient_keys: &HashSet<keys::Keys>,
+	recipient_keys: &HashSet<keys::KeyPairInfo>,
 	session_key: SessionKeys,
 ) -> Result<Vec<u8>, Crypt4GHError> {
 	let encryption_method = 0;
@@ -544,18 +545,16 @@ fn decrypt_block(ciphersegment: &[u8], session_keys: SessionKeys) -> Result<Vec<
 /// recipient keys specified in `recipient_keys`. If `trim` is true, it will discard
 /// the packages that cannot be decrypted.
 pub fn reencrypt<R: Read, W: Write>(
-	keys: &[Keys],
-	recipient_keys: &HashSet<Keys>,
-	read_buffer: &mut R,
-	write_buffer: &mut W,
-	trim: bool,
+	keys: &[KeyPairInfo],
+	recipient_keys: &HashSet<KeyPairInfo>,
+	trim: bool, // FIXME: Does this need to be an argument or can be decided in code?
 ) -> Result<(), Crypt4GHError> {
 	// Get header info
 	let mut temp_buf = [0_u8; 16]; // Size of the header
 	read_buffer
 		.read_exact(&mut temp_buf)
 		.map_err(|e| Crypt4GHError::ReadHeaderError(e.into()))?;
-	let header_info: header::HeaderInfo = header::deserialize_header_info((&temp_buf).to_vec())?;
+	let header_info: HeaderInfo = deserialize_header_info((&temp_buf).to_vec())?;
 
 	// Calculate header packets
 	let header_packets = (0..header_info.packets_count)
@@ -606,9 +605,7 @@ pub fn reencrypt<R: Read, W: Write>(
 /// If the range is specified, it will only rearrange the bytes from `range_start` to `range_start` + `range_span`.
 /// In case that `range_span` is none, it will rearrange from `range_start` to the end of the input.
 pub fn rearrange<R: Read, W: Write>(
-	keys: Vec<keys::Keys>,
-	read_buffer: &mut R,
-	write_buffer: &mut W,
+	keys: Vec<KeyPairInfo>,
 	range_start: usize,
 	range_span: Option<usize>,
 ) -> Result<(), Crypt4GHError> {
@@ -617,7 +614,7 @@ pub fn rearrange<R: Read, W: Write>(
 	read_buffer
 		.read_exact(&mut temp_buf)
 		.map_err(|e| Crypt4GHError::ReadHeaderError(e.into()))?;
-	let header_info: header::HeaderInfo = header::deserialize_header_info((&temp_buf).to_vec())?;
+	let header_info: HeaderInfo = deserialize_header_info((&temp_buf).to_vec())?;
 
 	// Calculate header packets
 	let header_packets = (0..header_info.packets_count)

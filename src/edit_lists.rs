@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::header::{encrypt, make_packet_data_edit_list, HeaderInfo};
-use crate::keys::Keys;
+use crate::keys::KeyPairInfo;
 use crate::keys::PrivateKey;
 use tokio::io::AsyncRead;
 
@@ -125,7 +125,7 @@ where
 
   /// Encrypt the edit list packet.
   pub fn encrypt_edit_list(&self, edit_list_packet: Vec<u8>) -> Result<Vec<u8>, Crypt4GHError> {
-    let keys = Keys {
+    let keys = KeyPairInfo {
       method: 0,
       privkey: self.private_key.clone().0,
       recipient_pubkey: self.recipient_public_key.clone().into_inner(),

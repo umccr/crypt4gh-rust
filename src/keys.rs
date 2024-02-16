@@ -4,9 +4,11 @@
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
 const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
 
+use crate::error::Crypt4GHError;
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 /// Key information.
-pub struct Keys {
+pub struct KeyPairInfo {
 	/// Method used for the key encryption.
 	/// > Only method 0 is supported.
 	pub method: u8,
@@ -65,8 +67,14 @@ impl KeyPair {
 }
 
 impl PublicKey {
+  /// Generate a new sender public key.
+  pub fn new() -> Self {
+    unimplemented!()
+    //Self { OsRng:: }
+  }  
+  
   /// Create a new sender public key from bytes.
-  pub fn new(bytes: Vec<u8>) -> Self {
+  pub fn new_from_bytes(bytes: Vec<u8>) -> Self {
     Self { bytes }
   }
 
@@ -79,4 +87,28 @@ impl PublicKey {
   pub fn get_ref(&self) -> &[u8] {
     self.bytes.as_slice()
   }
+}
+
+/// Generate a private and public key pair.
+pub fn generate_key_pair() -> Result<KeyPair, Crypt4GHError> {
+  // Todo, very janky, avoid writing this to a file first.
+  //let temp_dir = TempDir::new().map_err(|err| Crypt4GHError::NoTempFiles(err.to_string()))?;
+
+  let private_key = PrivateKey::new();
+  let public_key = PublicKey::new();
+  
+  // generate_keys(
+  //   private_key.clone(),
+  //   public_key.clone(),
+  //   Ok("".to_string()),
+  //   None,
+  // );
+
+  // let private_key = get_private_key(private_key, Ok("".to_string()))?;
+  // let public_key = get_public_key(public_key)?;
+
+  Ok(KeyPair::new(
+    private_key,
+    public_key
+  ))
 }

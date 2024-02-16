@@ -1,7 +1,7 @@
 use std::io;
 
 use bytes::{Bytes, BytesMut};
-use crate::header::{deserialize_header_info, HeaderInfo};
+use crate::header::{deserialize_header_info, EncryptedHeaderPacketBytes, HeaderInfo};
 use tokio_util::codec::Decoder;
 
 use crate::error::Crypt4GHError::{
@@ -68,6 +68,8 @@ impl Block {
         .as_ref()
         .try_into()
         .map_err(|_| SliceConversionError)?,
+        None,
+        None
     )
   }
 
@@ -129,7 +131,7 @@ impl Block {
         return Ok(None);
       }
 
-      header_packet_bytes.push(EncryptedHeaderPackets::new(
+      header_packet_bytes.push(EncryptedHeaderPacketBytes::new(
         length_bytes,
         src.split_to(length).freeze(),
       ));
@@ -232,7 +234,7 @@ impl Decoder for Block {
 
             Ok(Some(DecodedBlock::DataBlock(buf.split().freeze())))
           } else {
-            Err(Crypt4GHError::UnableToDecryptBlock(self.next_block, 
+            Err(Crypt4GHError::UnableToDecryptBlock(buf.to_vec(), 
               "the last data block is too large".to_string(),
             ))
           }

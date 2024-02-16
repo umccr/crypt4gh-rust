@@ -9,7 +9,7 @@ use std::task::{Context, Poll};
 
 use bytes::Bytes;
 use crate::header::{EncryptedHeaderPacketBytes, HeaderInfo};
-use crate::Keys;
+use crate::keys::{KeyPair, KeyPairInfo};
 use futures::ready;
 use futures::Stream;
 use pin_project_lite::pin_project;
@@ -33,7 +33,7 @@ pin_project! {
         inner: FramedRead<R, Block>,
         #[pin]
         header_packet_future: Option<HeaderPacketsDecrypter>,
-        keys: Vec<Keys>,
+        keys: Vec<KeyPairInfo>,
         sender_pubkey: Option<PublicKey>,
         encrypted_header_packets: Option<Vec<EncryptedHeaderPacketBytes>>,
         header_info: Option<HeaderInfo>,
@@ -181,9 +181,9 @@ where
         )),
       },
       Some(Err(e)) => Poll::Ready(Err(e)),
-      None => Poll::Ready(Err(Crypt4GHError(
+      None => Poll::Ready(Crypt4GHError::EndOfStreamReached(
         "end of stream reached without finding session keys".to_string(),
-      ))),
+      )),
     }
   }
 
@@ -298,7 +298,7 @@ impl<R> DecrypterStream<R> {
   }
 
   /// Get the stream's keys.
-  pub fn keys(&self) -> &[Keys] {
+  pub fn keys(&self) -> &[KeyPairInfo] {
     self.keys.as_slice()
   }
 

@@ -1,20 +1,20 @@
 use std::collections::HashSet;
+use std::io::Read;
+use bytes::Bytes;
 
 use aead::consts::U32;
 use aead::generic_array::GenericArray;
-
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::aead::OsRng;
 use chacha20poly1305::{self, aead, ChaCha20Poly1305, KeyInit, AeadCore};
-
-//use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-
 use crypto_kx::{SecretKey, PublicKey, Keypair};
-use crate::Keys;
+
+use serde::{Deserialize, Serialize};
 
 use super::SEGMENT_SIZE;
 use crate::error::Crypt4GHError;
+use crate::keys::KeyPair;
+use crate::keys::KeyPairInfo;
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
 
@@ -31,7 +31,8 @@ pub struct HeaderPackets {
 
 #[derive(Debug, Default, Clone)]
 pub struct EncryptedHeaderPacketBytes {
-	inner: Vec<u8>
+	pub packet_length: Bytes,
+	pub header: Bytes
 }
 
 /// Represents the encrypted header packet data, and the total size of all the header packets.
@@ -64,6 +65,37 @@ impl EncryptedHeaderPackets {
   pub fn into_inner(self) -> (Vec<EncryptedHeaderPacketBytes>, u64) {
     (self.header_packets, self.header_length)
   }
+}
+
+/// Represents the bytes inside the `EncryptedHeaderPackets`
+impl EncryptedHeaderPacketBytes {
+	/// Create header packet bytes.
+	pub fn new(packet_length: Bytes, header: Bytes) -> Self {
+	  Self {
+		packet_length,
+		header,
+	  }
+	}
+  
+	/// Get packet length bytes.
+	pub fn packet_length(&self) -> &Bytes {
+	  &self.packet_length
+	}
+  
+	/// Get header bytes.
+	pub fn header(&self) -> &Bytes {
+	  &self.header
+	}
+  
+	/// Get the owned packet length and header bytes.
+	pub fn into_inner(self) -> (Bytes, Bytes) {
+	  (self.packet_length, self.header)
+	}
+  
+	/// Get the header bytes only.
+	pub fn into_header_bytes(self) -> Bytes {
+	  self.header
+	}
 }
 
 /// Contains the parsed data of the packets
@@ -161,7 +193,7 @@ fn encrypt_x25519_chacha20_poly1305(
 ///
 /// * `packet` is a vector of bytes of information to be encrypted
 /// * `keys` is a unique collection of keys with `key.method` == 0
-pub fn encrypt(packet: &[u8], keys: &HashSet<Keys>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
+pub fn encrypt(packet: &[u8], keys: &HashSet<KeyPairInfo>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
 	keys.iter()
 		.filter(|key| key.method == 0)
 		.map(
@@ -192,7 +224,7 @@ pub fn serialize(packets: Vec<Vec<u8>>) -> Vec<u8> {
 
 fn decrypt(
 	encrypted_packets: Vec<Vec<u8>>,
-	keys: &[Keys],
+	keys: &[KeyPairInfo],
 	sender_pubkey: &Option<Vec<u8>>,
 ) -> (Vec<Vec<u8>>, Vec<Vec<u8>>) {
 	let mut decrypted_packets = Vec::new();
@@ -211,7 +243,7 @@ fn decrypt(
 	(decrypted_packets, ignored_packets)
 }
 
-fn decrypt_packet(packet: &[u8], keys: &[Keys], sender_pubkey: &Option<Vec<u8>>) -> Result<Vec<u8>, Crypt4GHError> {
+fn decrypt_packet(packet: &[u8], keys: &[KeyPairInfo], sender_pubkey: &Option<Vec<u8>>) -> Result<Vec<u8>, Crypt4GHError> {
 	let packet_encryption_method =
 		bincode::deserialize::<u32>(packet).map_err(|_| Crypt4GHError::ReadPacketEncryptionMethod)?;
 
@@ -335,7 +367,7 @@ fn parse_edit_list_packet(packet: &[u8]) -> Result<Vec<u64>, Crypt4GHError> {
 /// the data packets and the edit list packets. Finally, it parses the packets.
 pub fn deconstruct_header_body(
 	encrypted_packets: Vec<Vec<u8>>,
-	keys: &[Keys],
+	keys: &[KeyPairInfo],
 	sender_pubkey: &Option<Vec<u8>>,
 ) -> Result<DecryptedHeaderPackets, Crypt4GHError> {
 	let (packets, _) = decrypt(encrypted_packets, keys, sender_pubkey);
@@ -369,10 +401,12 @@ pub fn deconstruct_header_body(
 ///
 /// Reads the magic number, the version and the number of packets from the input bytes.
 pub fn deserialize_header_info(
-	header: Vec<u8>
+	header: Bytes,
+	keys: Vec<KeyPair>,
+	sender_pubkey: &Option<Vec<u8>>
 ) -> Result<HeaderInfo, Crypt4GHError> {
 	let header_info =
-		bincode::deserialize::<HeaderInfo>(header.as_slice()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
+		bincode::deserialize::<HeaderInfo>(header.bytes()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
 
 	if &header_info.magic_number != MAGIC_NUMBER {
 		return Err(Crypt4GHError::MagicStringError);
@@ -391,8 +425,8 @@ pub fn deserialize_header_info(
 /// key in `recipient_keys`. If trim is specified, the packets that cannot be decrypted are discarded.
 pub fn reencrypt(
 	header_packets: Vec<Vec<u8>>,
-	keys: &[Keys],
-	recipient_keys: &HashSet<Keys>,
+	keys: &[KeyPairInfo],
+	recipient_keys: &HashSet<KeyPairInfo>,
 	trim: bool,
 ) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
 	log::info!("Reencrypting the header");
@@ -422,7 +456,7 @@ pub fn reencrypt(
 /// along with an oracle that decides if the next packet should be kept (starting by the first).
 pub fn rearrange<'a>(
 	header_packets: Vec<Vec<u8>>,
-	keys: Vec<Keys>,
+	keys: Vec<KeyPairInfo>,
 	range_start: usize,
 	range_span: Option<usize>,
 	sender_pubkey: &Option<Vec<u8>>,
@@ -503,7 +537,7 @@ pub fn rearrange<'a>(
 
 	packets.push(edit_packet);
 
-	let hash_keys = keys.into_iter().collect::<HashSet<Keys>>();
+	let hash_keys = keys.into_iter().collect::<HashSet<KeyPairInfo>>();
 
 	let final_packets = packets
 		.into_iter()

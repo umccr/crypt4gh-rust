@@ -90,8 +90,6 @@ pub enum Crypt4GHError {
 	ReadBlockError(Box<dyn Error + Send + Sync>),
 	#[error("Error reading the remainder of the file (ERROR = {0:?})")]
 	ReadRemainderError(Box<dyn Error + Send + Sync>),
-	// #[error("Unable to read lines from {0:?} (ERROR = {1:?})")]
-	// ReadLinesError(PathBuf, Box<dyn Error + Send + Sync>),
 	#[error("Unable to deserialize rounds from private key")]
 	ReadRoundsError,
 	#[error("Unable to extract public key")]
@@ -154,6 +152,8 @@ pub enum Crypt4GHError {
 	// IO
 	#[error("IO failed")]
 	IoError(#[from] std::io::Error),
+	#[error("End of stream: {0:?}")]
+	EndOfStreamReached(String),
 	
 	// Conversion and decoding
 	#[error("converting slice to fixed size array")]

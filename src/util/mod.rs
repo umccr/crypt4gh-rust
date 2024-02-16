@@ -86,25 +86,3 @@ pub fn unencrypted_clamp_next(pos: u64, encrypted_file_size: u64) -> u64 {
   )
 }
 
-/// Generate a private and public key pair.
-pub fn generate_key_pair() -> Result<KeyPair, Crypt4GHError> {
-  // Todo, very janky, avoid writing this to a file first.
-  //let temp_dir = TempDir::new().map_err(|err| Crypt4GHError::NoTempFiles(err.to_string()))?;
-
-  let private_key = temp_dir.path().join("private_key");
-  let public_key = temp_dir.path().join("public_key");
-  generate_keys(
-    private_key.clone(),
-    public_key.clone(),
-    Ok("".to_string()),
-    None,
-  );
-
-  let private_key = get_private_key(private_key, Ok("".to_string()))?;
-  let public_key = get_public_key(public_key)?;
-
-  Ok(KeyPair::new(
-    PrivateKey(private_key),
-    PublicKey::new(public_key),
-  ))
-}

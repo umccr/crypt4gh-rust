@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 use std::{cmp, io};
 
 use crate::header::HeaderInfo;
-use crate::Keys;
+use crate::keys::KeyPairInfo;
 use futures::ready;
 use futures::stream::TryBuffered;
 use futures::Stream;
@@ -111,7 +111,7 @@ where
   }
 
   /// Get the reader's keys.
-  pub fn keys(&self) -> &[Keys] {
+  pub fn keys(&self) -> &[KeyPairInfo] {
     self.stream.get_ref().keys()
   }
 }

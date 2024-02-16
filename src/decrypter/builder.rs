@@ -1,5 +1,5 @@
 use crate::error::Crypt4GHError;
-use crate::keys::Keys;
+use crate::keys::{KeyPair, KeyPairInfo};
 use tokio::io::{AsyncRead, AsyncSeek};
 use tokio_util::codec::FramedRead;
 
@@ -49,7 +49,7 @@ impl Builder {
   }
 
   /// Build the decrypter.
-  pub fn build<R>(self, inner: R, keys: Vec<Keys>) -> DecrypterStream<R>
+  pub fn build<R>(self, inner: R, keys: Vec<KeyPairInfo>) -> DecrypterStream<R>
   where
     R: AsyncRead,
   {
@@ -78,7 +78,7 @@ impl Builder {
   pub async fn build_with_stream_length<R>(
     self,
     inner: R,
-    keys: Vec<Keys>,
+    keys: Vec<KeyPairInfo>,
   ) -> Result<DecrypterStream<R>, Crypt4GHError>
   where
     R: AsyncRead + AsyncSeek + Unpin,
