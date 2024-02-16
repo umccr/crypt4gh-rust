@@ -42,7 +42,7 @@ impl HeaderPacketsDecrypter {
         .into_iter()
         .map(|bytes| bytes.to_vec())
         .collect(),
-      keys.as_slice(),
+//      keys.as_slice(),
       &sender_pubkey.map(|pubkey| pubkey.into_inner()),
     )?)
   }

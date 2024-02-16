@@ -1,99 +1,96 @@
-mod edit_list_gen;
-mod test_common;
+#[cfg(test)]
+mod tests {
+  // use htsget_test::crypt4gh::{get_decryption_keys, get_encryption_keys};
+  // use htsget_test::http_tests::get_test_file;
 
-use std::{fs::File, path::PathBuf};
+  use crate::reader::builder::Builder;
 
-pub use test_common::*;
-use testresult::TestResult;
-use crypt4gh::keys::get_private_key;
-use crypt4gh::Keys;
-use std::io::Read;
+  use super::*;
 
+  #[tokio::test]
+  async fn test_append_edit_list() {
+    let src = get_test_file("crypt4gh/htsnexus_test_NA12878.bam.c4gh").await;
+    let (private_key_decrypt, public_key_decrypt) = get_decryption_keys().await;
+    let (private_key_encrypt, public_key_encrypt) = get_encryption_keys().await;
 
-const INPUT_EDIT_LIST: &str = "Let's have
- beers 
-in the sauna!
- or 
-Dinner 
-at 7pm?
-";
+    let mut reader = Builder::default()
+      .with_sender_pubkey(PublicKey::new(public_key_decrypt.clone()))
+      .with_stream_length(5485112)
+      .build_with_reader(src, vec![private_key_decrypt.clone()]);
+    reader.read_header().await.unwrap();
 
-#[test]
-fn test_send_message_buried() -> TestResult {
-	pretty_env_logger::init();
+    let expected_data_packets = reader.session_keys().to_vec();
 
-	// Init
-	let init = Cleanup::new();
+    let header = EditHeader::new(
+      &reader,
+      test_unencrypted_positions(),
+      test_clamped_positions(),
+      PrivateKey(private_key_encrypt.clone().privkey),
+      PublicKey {
+        bytes: public_key_encrypt.clone(),
+      },
+    )
+    .edit_list()
+    .unwrap()
+    .unwrap();
 
-	// Create input file
-	echo(
-		"Let's have beers in the sauna! or Dinner at 7pm?",
-		&temp_file("message.bob"),
-	);
+    let header_slice = header.as_slice();
+    let mut reader = Builder::default()
+      .with_sender_pubkey(PublicKey::new(public_key_decrypt))
+      .with_stream_length(5485112)
+      .build_with_reader(header_slice.as_slice(), vec![private_key_decrypt]);
+    reader.read_header().await.unwrap();
 
-	// Bob encrypts a file for Alice, and tucks in an edit list. The skipped pieces are random data.
-	let mut file = File::create(&temp_file("message.bob.c4gh"))?;
-	edit_list_gen::generate(
-		&add_prefix(BOB_SECKEY),
-		&add_prefix(ALICE_PUBKEY),
-		INPUT_EDIT_LIST,
-		&mut file,
-		BOB_PASSPHRASE,
-	)?;
+    let data_packets = reader.session_keys();
+    assert_eq!(data_packets, expected_data_packets);
 
-	let sender_pubkey = None;
-	let (range_start, range_span) = (0, None);
+    let edit_lists = reader.edit_list_packet().unwrap();
+    assert_eq!(edit_lists, expected_edit_list());
+  }
 
-	let seckey = get_private_key(PathBuf::from("tests/testfiles/alice.sec"), Ok(ALICE_PASSPHRASE.to_string()))?;
+  #[tokio::test]
+  async fn test_create_edit_list() {
+    let src = get_test_file("crypt4gh/htsnexus_test_NA12878.bam.c4gh").await;
+    let (private_key_decrypt, public_key_decrypt) = get_decryption_keys().await;
+    let (private_key_encrypt, public_key_encrypt) = get_encryption_keys().await;
 
-	let keys = vec![Keys {
-		method: 0,
-		privkey: seckey,
-		recipient_pubkey: vec![],
-	}];
+    let mut reader = Builder::default()
+      .with_sender_pubkey(PublicKey::new(public_key_decrypt.clone()))
+      .with_stream_length(5485112)
+      .build_with_reader(src, vec![private_key_decrypt.clone()]);
+    reader.read_header().await.unwrap();
 
-	// log::debug!("run_decrypt()'s parameters: {:#?}, {}, {:#?}, {:#?}", &keys, range_start, range_span, &sender_pubkey );
+    let edit_list = EditHeader::new(
+      &reader,
+      test_unencrypted_positions(),
+      test_clamped_positions(),
+      PrivateKey(private_key_encrypt.clone().privkey),
+      PublicKey {
+        bytes: public_key_encrypt.clone(),
+      },
+    )
+    .create_edit_list();
 
-	let mut file = File::open(PathBuf::from("tests/tempfiles/message.bob.c4gh"))?;
+    assert_eq!(edit_list, expected_edit_list());
+  }
 
-	let mut out = vec![];
-	file.read_to_end(&mut out)?;
+  fn test_unencrypted_positions() -> Vec<UnencryptedPosition> {
+    vec![
+      UnencryptedPosition::new(0, 7853),
+      UnencryptedPosition::new(145110, 453039),
+      UnencryptedPosition::new(5485074, 5485112),
+    ]
+  }
 
-	let mut buf_in = std::io::BufReader::new(&out[..]);
-	let mut buf = vec![];
-	
-	// Decrypt
-	crypt4gh::decrypt(
-		&keys,
-		&mut buf_in,
-		&mut buf,
-		range_start,
-		range_span,
-		&sender_pubkey,
-	)?;
+  fn test_clamped_positions() -> Vec<ClampedPosition> {
+    vec![
+      ClampedPosition::new(0, 65536),
+      ClampedPosition::new(131072, 458752),
+      ClampedPosition::new(5439488, 5485112),
+    ]
+  }
 
-	// This CLI-only testing (integration tests) garble stdin/stdout which makes it very impractical to debug (with log::debug/log::info).
-	//
-	// CommandUnderTest::new()
-	// 	.env("C4GH_PASSPHRASE", ALICE_PASSPHRASE)
-	// 	.arg("decrypt")
-	// 	.arg("--sk")
-	// 	.arg(ALICE_SECKEY)
-	// 	.pipe_in(&temp_file("message.bob.c4gh"))
-	// 	.pipe_out(&temp_file("message.alice"))
-	// 	.succeeds();
-
-	let mut bob = File::open(&temp_file("message.bob")).unwrap();
-	let mut out_copy = vec![];
-	bob.read_to_end(&mut out_copy)?;
-	assert_eq!(buf, out_copy);
-
-	// Compare
-	// equal(&temp_file("message.bob"), &temp_file("message.alice"));
-
-	// Cleanup
-	drop(init);
-
-	// All went fine!
-	Ok(())
+  fn expected_edit_list() -> Vec<u64> {
+    vec![0, 7853, 71721, 307929, 51299, 38]
+  }
 }

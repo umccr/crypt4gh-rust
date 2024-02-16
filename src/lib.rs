@@ -426,7 +426,7 @@ impl<'a, W: Write> DecryptedBuffer<'a, W> {
 /// the first `range_start` bytes. It uses the `edit_list` packets.
 pub fn body_decrypt_parts<W: Write>(
 	mut read_buffer: impl Read,
-	session_keys: Vec<Vec<u8>>,
+	session_keys: SessionKeys,
 	output: WriteInfo<W>,
 	edit_list: Vec<u64>,
 ) -> Result<(), Crypt4GHError> {
@@ -617,7 +617,7 @@ pub fn rearrange<R: Read, W: Write>(
 	read_buffer
 		.read_exact(&mut temp_buf)
 		.map_err(|e| Crypt4GHError::ReadHeaderError(e.into()))?;
-	let header_info: header::HeaderInfo = header::deserialize_header_info(&temp_buf)?;
+	let header_info: header::HeaderInfo = header::deserialize_header_info((&temp_buf).to_vec())?;
 
 	// Calculate header packets
 	let header_packets = (0..header_info.packets_count)

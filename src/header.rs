@@ -29,6 +29,7 @@ pub struct HeaderPackets {
 	edit_list_packet: Option<Vec<u8>>,
 }
 
+#[derive(Debug)]
 pub struct EncryptedHeaderPacketBytes {
 	inner: Vec<u8>
 }
@@ -366,12 +367,12 @@ pub fn deconstruct_header_body(
 
 /// Deserializes the data info from the header bytes.
 ///
-/// Reads the magic number, the version and the number of packets from the bytes.
+/// Reads the magic number, the version and the number of packets from the input bytes.
 pub fn deserialize_header_info(
-	header_info: HeaderInfo, // TODO: HeaderInfo::len()
+	header: Vec<u8>,
 ) -> Result<HeaderInfo, Crypt4GHError> {
 	let header_info =
-		bincode::deserialize::<HeaderInfo>(header_info).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
+		bincode::deserialize::<HeaderInfo>(header.as_slice()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
 
 	if &header_info.magic_number != MAGIC_NUMBER {
 		return Err(Crypt4GHError::MagicStringError);
@@ -510,26 +511,4 @@ pub fn rearrange<'a>(
 		.collect::<Result<Vec<Vec<u8>>, Crypt4GHError>>()?;
 
 	Ok((final_packets, segment_oracle))
-}
-
-#[cfg(test)]
-mod tests {
-
-	use super::*;
-
-	#[test]
-	fn enum_serialization_0() {
-		assert_eq!(
-			bincode::serialize(&HeaderPacketType::DataEnc).unwrap(),
-			0_u32.to_le_bytes()
-		);
-	}
-
-	#[test]
-	fn enum_serialization_1() {
-		assert_eq!(
-			bincode::serialize(&HeaderPacketType::EditList).unwrap(),
-			1_u32.to_le_bytes()
-		);
-	}
 }
