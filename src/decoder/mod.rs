@@ -1,7 +1,7 @@
 use std::io;
 
 use bytes::{Bytes, BytesMut};
-use crate::header::{deserialize_header_info, EncryptedHeaderPacketBytes, HeaderInfo};
+use crate::header::{Header, EncryptedHeaderPacketBytes};
 use tokio_util::codec::Decoder;
 
 use crate::error::Crypt4GHError::{
@@ -68,8 +68,6 @@ impl Block {
         .as_ref()
         .try_into()
         .map_err(|_| SliceConversionError)?,
-        None,
-        None
     )
   }
 
