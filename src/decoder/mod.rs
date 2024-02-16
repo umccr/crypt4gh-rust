@@ -5,7 +5,7 @@ use crate::header::{deserialize_header_info, HeaderInfo};
 use tokio_util::codec::Decoder;
 
 use crate::error::Crypt4GHError::{
-  self, DecodingHeaderInfo, MaximumHeaderSize, NumericConversionError, SliceConversionError
+  self, MaximumHeaderSize, NumericConversionError, SliceConversionError
 };
 use crate::header::EncryptedHeaderPackets;
 

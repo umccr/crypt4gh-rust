@@ -29,7 +29,7 @@ pub struct HeaderPackets {
 	edit_list_packet: Option<Vec<u8>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct EncryptedHeaderPacketBytes {
 	inner: Vec<u8>
 }
@@ -369,7 +369,7 @@ pub fn deconstruct_header_body(
 ///
 /// Reads the magic number, the version and the number of packets from the input bytes.
 pub fn deserialize_header_info(
-	header: Vec<u8>,
+	header: Vec<u8>
 ) -> Result<HeaderInfo, Crypt4GHError> {
 	let header_info =
 		bincode::deserialize::<HeaderInfo>(header.as_slice()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;

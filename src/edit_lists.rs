@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::header::{encrypt, make_packet_data_edit_list, HeaderInfo};
 use crate::keys::Keys;
-use rustls::PrivateKey;
+use crate::keys::PrivateKey;
 use tokio::io::AsyncRead;
 
 use crate::error::Crypt4GHError;

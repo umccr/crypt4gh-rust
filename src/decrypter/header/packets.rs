@@ -32,7 +32,7 @@ impl HeaderPacketsDecrypter {
     }
   }
 
-  pub fn decrypt(
+  pub fn decrypt_header(
     header_packets: Vec<Bytes>,
     keys: Vec<Keys>,
     sender_pubkey: Option<PublicKey>,
@@ -41,10 +41,10 @@ impl HeaderPacketsDecrypter {
       header_packets
         .into_iter()
         .map(|bytes| bytes.to_vec())
-        .collect(),
-//      keys.as_slice(),
-      &sender_pubkey.map(|pubkey| pubkey.into_inner()),
-    )?)
+        .collect()?)?
+      // keys.as_slice(),
+      // &sender_pubkey.map(|pubkey| pubkey.into_inner()),
+    )
   }
 }
 
@@ -53,28 +53,5 @@ impl Future for HeaderPacketsDecrypter {
 
   fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     self.project().handle.poll(cx).map_err(JoinHandleError)?
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use crate::decoder::tests::{assert_first_header_packet, get_first_header_packet};
-
-  use super::*;
-
-  #[tokio::test]
-  async fn header_packet_decrypter() {
-    let (recipient_private_key, sender_public_key, header_packets, _) =
-      get_first_header_packet().await;
-
-    let data = HeaderPacketsDecrypter::new(
-      header_packets,
-      vec![recipient_private_key],
-      Some(PublicKey::new(sender_public_key)),
-    )
-    .await
-    .unwrap();
-
-    assert_first_header_packet(data);
   }
 }

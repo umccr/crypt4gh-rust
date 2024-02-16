@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{Context, Poll};

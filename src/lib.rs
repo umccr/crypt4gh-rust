@@ -256,7 +256,7 @@ pub fn decrypt(
     let mut write_info = WriteInfo::new(0, None, &mut write_buf);
 
     // Todo crypt4gh-rust body_decrypt_parts does not work properly, so just apply edit list here.
-    body_decrypt(read_buf, session_keys.as_slice(), &mut write_info, 0)
+    body_decrypt(read_buf, session_keys, &mut write_info, 0)
       .map_err(|err| Crypt4GHError::UnableToDecryptBlock(read_buf, err.to_string()))?;
     let mut decrypted_bytes: Bytes = write_buf.into_inner().into();
     let mut edited_bytes = Bytes::new();
@@ -295,7 +295,7 @@ struct DecryptedBuffer<'a, W: Write> {
 }
 
 impl<'a, W: Write> DecryptedBuffer<'a, W> {
-	fn new(read_buffer: &'a mut impl Read, session_keys: keys::SessionKeys, output: WriteInfo<'a, W>) -> Result<Self, Crypt4GHError> {
+	fn new(read_buffer: &'a mut impl Read, session_keys: SessionKeys, output: WriteInfo<'a, W>) -> Result<Self, Crypt4GHError> {
 		let mut decryptor = Self {
 			read_buffer,
 			session_keys,
@@ -337,7 +337,7 @@ impl<'a, W: Write> DecryptedBuffer<'a, W> {
 		// Decrypts its buffer
 		if !self.is_decrypted {
 			log::debug!("Decrypting block({:?}): {:?}", self.buf.len(), &self.buf);
-			self.buf = decrypt_block(&self.buf, &self.session_keys)?;
+			self.buf = decrypt_block(&self.buf, self.session_keys)?;
 			self.is_decrypted = true;
 		}
 		Ok(())
@@ -477,7 +477,7 @@ pub fn body_decrypt_parts<W: Write>(
 /// the first `range_start` bytes.
 pub fn body_decrypt<W: Write>(
 	mut read_buffer: impl Read,
-	session_keys: &[Vec<u8>],
+	session_keys: SessionKeys,
 	output: &mut WriteInfo<W>,
 	range_start: usize,
 ) -> Result<(), Crypt4GHError> {
@@ -517,14 +517,14 @@ pub fn body_decrypt<W: Write>(
 }
 
 /// Reads and returns the first successfully decrypted block, iterating through all the session keys against one ciphersegment.
-fn decrypt_block(ciphersegment: &[u8], session_keys: &[Vec<u8>]) -> Result<Vec<u8>, Crypt4GHError> {
+fn decrypt_block(ciphersegment: &[u8], session_keys: SessionKeys) -> Result<Vec<u8>, Crypt4GHError> {
 	//log::debug!("Decrypt_block()'s the cyphersegment is: {:#?}", ciphersegment);
 	let (nonce_slice, data) = ciphersegment.split_at(12);
     let nonce_bytes: [u8; 12] = nonce_slice
         .try_into()
         .map_err(|_| Crypt4GHError::UnableToWrapNonce)?;
 
-	session_keys.iter()
+	session_keys.inner.iter()
 		.find_map(|key| {
 			let key = Key::from_slice(&key);
 			let key = chacha20poly1305::ChaCha20Poly1305::new(&key);
@@ -555,7 +555,7 @@ pub fn reencrypt<R: Read, W: Write>(
 	read_buffer
 		.read_exact(&mut temp_buf)
 		.map_err(|e| Crypt4GHError::ReadHeaderError(e.into()))?;
-	let header_info: header::HeaderInfo = header::deserialize_header_info(&temp_buf)?;
+	let header_info: header::HeaderInfo = header::deserialize_header_info((&temp_buf).to_vec())?;
 
 	// Calculate header packets
 	let header_packets = (0..header_info.packets_count)
