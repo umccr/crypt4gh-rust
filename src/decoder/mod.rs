@@ -1,14 +1,11 @@
 use std::io;
 
 use bytes::{Bytes, BytesMut};
-use crate::header::{EncryptedHeaderPacketBytes, Header, HeaderInfo};
 use tokio_util::codec::Decoder;
 
-use crate::error::Crypt4GHError::{
+use crate::{error::Crypt4GHError::{
   self, MaximumHeaderSize, NumericConversionError, SliceConversionError
-};
-use crate::header::EncryptedHeaderPackets;
-
+}, header::HeaderPacket};
 pub const ENCRYPTED_BLOCK_SIZE: usize = 65536;
 pub const NONCE_SIZE: usize = 12; // ChaCha20 IETF Nonce size
 pub const MAC_SIZE: usize = 16;
@@ -32,10 +29,10 @@ const MAX_HEADER_SIZE: usize = 8 * 1024 * 1024;
 pub enum DecodedBlock {
   /// The magic string, version string and header packet count.
   /// Corresponds to `deconstruct_header_info`.
-  HeaderInfo(HeaderInfo),
+  HeaderInfo(Header),
   /// Header packets, both data encryption key packets and a data edit list packets.
   /// Corresponds to `deconstruct_header_body`.
-  HeaderPackets(EncryptedHeaderPackets),
+  HeaderPackets(HeaderPacket),
   /// The encrypted data blocks
   /// Corresponds to `body_decrypt`.
   DataBlock(Bytes),
