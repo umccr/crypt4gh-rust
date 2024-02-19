@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::io::Read;
+use std::mem::uninitialized;
 use bytes::Bytes;
 
 use aead::consts::U32;
@@ -123,9 +124,15 @@ pub struct HeaderInfo {
 }
 
 impl Header {
-	pub fn new() {
-
+	/// New empty header
+	pub fn new(header_bytes: Bytes) -> Self {
+		unimplemented!();
 	}
+
+	/// New header from Bytes
+	// pub fn new_from_bytes(self, header_bytes: Bytes) {
+	// 	unimplemented!();
+	// }
 
 	/// Constructs an encrypted data packet
 	pub fn make_packet_data_enc(encryption_method: usize, session_key: &[u8; 32]) -> Vec<u8> {
@@ -203,7 +210,7 @@ impl Header {
 	///
 	/// * `packet` is a vector of bytes of information to be encrypted
 	/// * `keys` is a unique collection of keys with `key.method` == 0
-	pub fn encrypt(packet: &[u8], keys: &HashSet<KeyPairInfo>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
+	pub fn encrypt(&mut self, packet: &[u8], keys: &HashSet<KeyPairInfo>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
 		keys.iter()
 			.filter(|key| key.method == 0)
 			.map(
@@ -218,7 +225,7 @@ impl Header {
 	/// Serializes the header.
 	///
 	/// Returns [ Magic "crypt4gh" + version + packet count + header packets... ] serialized.
-	pub fn serialize(packets: Vec<Vec<u8>>) -> Vec<u8> {
+	pub fn serialize(&mut self, packets: Vec<Vec<u8>>) -> Vec<u8> {
 		log::info!("Serializing the header ({} packets)", packets.len());
 		vec![
 			MAGIC_NUMBER.to_vec(),
@@ -232,7 +239,8 @@ impl Header {
 		.concat()
 	}
 
-	fn decrypt(
+	pub fn decrypt(
+		&mut self,
 		encrypted_packets: Vec<Vec<u8>>,
 		keys: &[KeyPairInfo],
 		sender_pubkey: &Option<Vec<u8>>,
@@ -410,7 +418,7 @@ impl Header {
 	/// Deserializes the data info from the header bytes.
 	///
 	/// Reads the magic number, the version and the number of packets from the input bytes.
-	pub fn deserialize_header_info(
+	pub fn deserialize(&self,
 		header: Bytes,
 		keys: Vec<KeyPair>,
 		sender_pubkey: &Option<Vec<u8>>

@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use crate::header::{deserialize_header_info, DecryptedHeaderPackets};
+use crate::header::{DecryptedHeaderPackets, Header};
 use pin_project_lite::pin_project;
 use tokio::task::{spawn_blocking, JoinHandle};
 
@@ -36,6 +36,9 @@ impl HeaderPacketsDecrypter {
     keys: Vec<KeyPairInfo>,
     sender_pubkey: Option<PublicKey>,
   ) -> Result<DecryptedHeaderPackets, Crypt4GHError> {
+    let header = Header::new_from_bytes(header_packets.as_slice());
+
+    
     Ok(deserialize_header_info(
       header_packets
         .into_iter()

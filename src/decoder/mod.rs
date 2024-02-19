@@ -1,7 +1,7 @@
 use std::io;
 
 use bytes::{Bytes, BytesMut};
-use crate::header::{Header, EncryptedHeaderPacketBytes};
+use crate::header::{EncryptedHeaderPacketBytes, Header, HeaderInfo};
 use tokio_util::codec::Decoder;
 
 use crate::error::Crypt4GHError::{
