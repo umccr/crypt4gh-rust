@@ -30,7 +30,7 @@ enum HeaderPacketType {
 }
 
 enum HeaderPacketDataType {
-	Packet {DataEncryptionPacket: u8, EditListPacket: u8 }
+	Packet {DataEncryptionPacket: Vec<u8>, EditListPacket: Vec<u8> }
 }
 
 pub struct Header {
