@@ -1,136 +1,93 @@
 use std::collections::HashSet;
 use std::io::Read;
-use std::mem::uninitialized;
 use bytes::Bytes;
 
 use aead::consts::U32;
 use aead::generic_array::GenericArray;
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::aead::OsRng;
+use chacha20poly1305::Nonce;
 use chacha20poly1305::{self, aead, ChaCha20Poly1305, KeyInit, AeadCore};
 use crypto_kx::{SecretKey, PublicKey, Keypair};
 
+use curve25519_dalek::digest::Mac;
 use serde::{Deserialize, Serialize};
+use ssh_key::PrivateKey;
 
 use super::SEGMENT_SIZE;
 use crate::error::Crypt4GHError;
+use crate::keys::EncryptionMethod;
 use crate::keys::KeyPair;
 use crate::keys::KeyPairInfo;
+
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
 
 #[derive(Serialize, Deserialize, PartialEq)]
 enum HeaderPacketType {
-	DataEnc = 0, // FIXME: C-style enums not needed here? Remove numbers.
-	EditList = 1,
+	DataEnc,
+	EditList
+}
+
+enum HeaderPacketDataType {
+	Packet {DataEncryptionPacket: u8, EditListPacket: u8 }
 }
 
 pub struct Header {
-	header_info: HeaderInfo,
-	header_data: Bytes
+	magic: [u8; 8], 
+	version: u8,
+	packet_count: u32,
+	header_packets: Vec<HeaderPacket>
 }
 
-pub struct HeaderPackets {
-	data_enc_packets: Vec<Vec<u8>>,
-	edit_list_packet: Option<Vec<u8>>,
+pub struct HeaderPacket {
+	packet_length: u32,
+	encryption_method: EncryptionMethod, 
+	writer_pubkey: PublicKey,
+	nonce: Nonce,
+	encrypted_packet_data: EncryptedPacketData,
+	mac: Bytes //dalek::Mac type might be more fitting
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct EncryptedHeaderPacketBytes {
-	pub packet_length: Bytes,
-	pub header: Bytes
+pub struct EncryptedPacketData {
+	packet_type: HeaderPacketType,
+	packet_data: HeaderPacketDataType
 }
 
-/// Represents the encrypted header packet data, and the total size of all the header packets.
-#[derive(Debug, Default)]
-pub struct EncryptedHeaderPackets {
-  header_packets: Vec<EncryptedHeaderPacketBytes>,
-  header_length: u64,
+struct DataEncryptionPacket {
+	encryption_method: EncryptionMethod,
+	data_encryption_key: PrivateKey
 }
 
-impl EncryptedHeaderPackets {
-  /// Create a new decrypted data block.
-  pub fn new(header_packets: Vec<EncryptedHeaderPacketBytes>, size: u64) -> Self {
-    Self {
-      header_packets,
-      header_length: size,
-    }
-  }
-
-  /// Get the header packet bytes
-  pub fn header_packets(&self) -> &Vec<EncryptedHeaderPacketBytes> {
-    &self.header_packets
-  }
-
-  /// Get the size of all the packets.
-  pub fn header_length(&self) -> u64 {
-    self.header_length
-  }
-
-  /// Get the inner bytes and size.
-  pub fn into_inner(self) -> (Vec<EncryptedHeaderPacketBytes>, u64) {
-    (self.header_packets, self.header_length)
-  }
-}
-
-/// Represents the bytes inside the `EncryptedHeaderPackets`
-impl EncryptedHeaderPacketBytes {
-	/// Create header packet bytes.
-	pub fn new(packet_length: Bytes, header: Bytes) -> Self {
-	  Self {
-		packet_length,
-		header,
-	  }
-	}
-  
-	/// Get packet length bytes.
-	pub fn packet_length(&self) -> &Bytes {
-	  &self.packet_length
-	}
-  
-	/// Get header bytes.
-	pub fn header(&self) -> &Bytes {
-	  &self.header
-	}
-  
-	/// Get the owned packet length and header bytes.
-	pub fn into_inner(self) -> (Bytes, Bytes) {
-	  (self.packet_length, self.header)
-	}
-  
-	/// Get the header bytes only.
-	pub fn into_header_bytes(self) -> Bytes {
-	  self.header
-	}
-}
-
-/// Contains the parsed data of the packets
-pub struct DecryptedHeaderPackets {
-	/// The packets that are coded as data
-	pub data_enc_packets: Vec<Vec<u8>>,
-	/// The packets that are an edit list
-	pub edit_list_packet: Option<Vec<u64>>,
-}
-
-/// Contains the basic information of the header.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct HeaderInfo {
-	/// A “magic” string for file type identification. It should be the ASCII representation of the string "crypt4gh".
-	pub magic_number: [u8; 8],
-	/// A version number (four-byte little-endian). The current version is 1.
-	pub version: u32,
-	/// The number of packets that the header contains.
-	pub packets_count: u32,
+struct EditListPacket {
+	number_lengths: Vec<u8>,
+	lengths: Vec<u8>
 }
 
 impl Header {
-	/// New empty header
-	pub fn new(header_bytes: Bytes) -> Self {
-		unimplemented!();
+	pub fn new() -> Self {
+		todo!()
+	}
+	
+	/// Get the header packet bytes
+	pub fn header_packets(&self) -> &Vec<HeaderPacket> {
+		&self.header_packets
 	}
 
+	/// Get the size of all the packets.
+	pub fn header_length(&self) -> u64 {
+		self.header_length
+	}
+
+	/// Get the inner bytes and size.
+	pub fn into_inner(self) -> (Vec<HeaderPacket>, u64) {
+		(self.header_packets, self.header_length)
+	}
+
+	// FIXME: implement default
+
 	/// New header from Bytes
-	// pub fn new_from_bytes(self, header_bytes: Bytes) {
+	// pub fn from(self, header_bytes: Bytes) {
 	// 	unimplemented!();
 	// }
 
@@ -210,7 +167,7 @@ impl Header {
 	///
 	/// * `packet` is a vector of bytes of information to be encrypted
 	/// * `keys` is a unique collection of keys with `key.method` == 0
-	pub fn encrypt(&mut self, packet: &[u8], keys: &HashSet<KeyPairInfo>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
+	pub fn encrypt(&self, packet: &[u8], keys: &HashSet<KeyPairInfo>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
 		keys.iter()
 			.filter(|key| key.method == 0)
 			.map(
@@ -225,7 +182,7 @@ impl Header {
 	/// Serializes the header.
 	///
 	/// Returns [ Magic "crypt4gh" + version + packet count + header packets... ] serialized.
-	pub fn serialize(&mut self, packets: Vec<Vec<u8>>) -> Vec<u8> {
+	pub fn serialize(&self, packets: Vec<Vec<u8>>) -> Vec<u8> {
 		log::info!("Serializing the header ({} packets)", packets.len());
 		vec![
 			MAGIC_NUMBER.to_vec(),
@@ -387,7 +344,7 @@ impl Header {
 		encrypted_packets: Vec<Vec<u8>>,
 		keys: &[KeyPairInfo],
 		sender_pubkey: &Option<Vec<u8>>,
-	) -> Result<DecryptedHeaderPackets, Crypt4GHError> {
+	) -> Result<Vec<HeaderPacket>, Crypt4GHError> {
 		let (packets, _) = decrypt(encrypted_packets, keys, sender_pubkey);
 
 		if packets.is_empty() {
@@ -409,10 +366,11 @@ impl Header {
 			None => None,
 		};
 
-		Ok(DecryptedHeaderPackets {
-			data_enc_packets: session_keys,
-			edit_list_packet: edit_list,
-		})
+		todo!()
+		// Ok(Vec<HeaderPacket> {
+		// 	data_enc_packets: session_keys,
+		// 	edit_list_packet: edit_list,
+		// })
 	}
 
 	/// Deserializes the data info from the header bytes.
@@ -422,9 +380,9 @@ impl Header {
 		header: Bytes,
 		keys: Vec<KeyPair>,
 		sender_pubkey: &Option<Vec<u8>>
-	) -> Result<HeaderInfo, Crypt4GHError> {
+	) -> Result<Header, Crypt4GHError> {
 		let header_info =
-			bincode::deserialize::<HeaderInfo>(header.bytes()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
+			bincode::deserialize::<Header>(header.bytes()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
 
 		if &header_info.magic_number != MAGIC_NUMBER {
 			return Err(Crypt4GHError::MagicStringError);
@@ -446,7 +404,7 @@ impl Header {
 		keys: &[KeyPairInfo],
 		recipient_keys: &HashSet<KeyPairInfo>,
 		trim: bool,
-	) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
+	) -> Result<Header, Crypt4GHError> {
 		log::info!("Reencrypting the header");
 
 		let (decrypted_packets, mut ignored_packets) = decrypt(header_packets, keys, &None);
@@ -564,5 +522,16 @@ impl Header {
 
 		Ok((final_packets, segment_oracle))
 	}
+}
+
+impl Default for Header {
+    fn default() -> Self {
+        Self {
+            magic: MAGIC_NUMBER,
+            version: VERSION,
+            packet_count: 0,
+            header_packets: Vec::new(),
+        }
+    }
 }
 

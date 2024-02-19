@@ -7,15 +7,21 @@ const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
 use crate::error::Crypt4GHError;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub enum EncryptionMethod {
+  X25519Chacha20Poly305,
+  Aes256Gcm
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 /// Key information.
 pub struct KeyPairInfo {
 	/// Method used for the key encryption.
 	/// > Only method 0 is supported.
-	pub method: u8,
+	pub method: EncryptionMethod,
 	/// Secret key of the encryptor / decryptor (your key).
-	pub privkey: Vec<u8>,
+	pub privkey: PrivateKey,
 	/// Public key of the recipient (the key you want to encrypt for).
-	pub recipient_pubkey: Vec<u8>,
+	pub recipient_pubkey: PublicKey,
 }
 
 pub struct SessionKeys {
@@ -23,13 +29,13 @@ pub struct SessionKeys {
 }
 
 /// Private keys are just bytes since it should support disparate formats, i.e: SSH and GA4GH
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct PrivateKey {
   pub bytes: Vec<u8>,
 }
 
 /// A wrapper around a vec of bytes that represent a public key.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct PublicKey {
   pub bytes: Vec<u8>,
 }
