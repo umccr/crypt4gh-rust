@@ -14,7 +14,7 @@ use curve25519_dalek::digest::Mac;
 use serde::{Deserialize, Serialize};
 use ssh_key::PrivateKey;
 
-use super::SEGMENT_SIZE;
+use crate::encrypted_data::SEGMENT_SIZE;
 use crate::error::Crypt4GHError;
 use crate::keys::EncryptionMethod;
 use crate::keys::KeyPair;
@@ -25,6 +25,15 @@ const VERSION: u32 = 1;
 
 /// Structs below follow crypt4gh spec §2.2
 /// 
+/// Header precedes data blocks and is described in crypt4gh spec §3.2 and §2.2 for a high level graphical representation of
+/// the file structure. 
+pub struct Header {
+	magic: [u8; 8], 
+	version: u32,
+	count: u32,
+	packets: Vec<HeaderPacket>
+}
+
 /// Encodes actual encrypted data from a header packet or an edit list. 
 #[derive(Serialize, Deserialize, PartialEq)]
 enum HeaderPacketType {
@@ -35,14 +44,6 @@ enum HeaderPacketType {
 /// Data-bearing Header Packet data type as it can hold either depending on packet type
 enum HeaderPacketDataType {
 	Packet {DataEncryptionPacket: Vec<u8>, EditListPacket: Vec<u8> }
-}
-
-/// Header precedes data blocks and is described in crypt4gh spec §3.2 and §2.2 for a high level graphical representation 
-pub struct Header {
-	magic: [u8; 8], 
-	version: u32,
-	packet_count: u32,
-	header_packets: Vec<HeaderPacket>
 }
 
 /// As described in crypt4gh spec §3.2.1 
@@ -79,18 +80,18 @@ impl Header {
 	}
 	
 	/// Get the header packet bytes
-	pub fn header_packets(&self) -> &Vec<HeaderPacket> {
-		&self.header_packets
+	pub fn packets(&self) -> &Vec<HeaderPacket> {
+		&self.packets
 	}
 
 	/// Get the size of all the packets.
-	pub fn header_length(&self) -> u64 {
-		self.header_length
+	pub fn length(&self) -> u64 {
+		self.length
 	}
 
 	/// Get the inner bytes and size.
 	pub fn into_inner(self) -> (Vec<HeaderPacket>, u64) {
-		(self.header_packets, self.header_length)
+		(self.packets, self.length)
 	}
 
 	// FIXME: implement default
@@ -101,7 +102,7 @@ impl Header {
 	// }
 
 	/// Constructs an encrypted data packet
-	pub fn make_packet_data_enc(encryption_method: usize, session_key: &[u8; 32]) -> Vec<u8> {
+	pub fn make_data_enc_packet(encryption_method: usize, session_key: &[u8; 32]) -> Vec<u8> {
 		vec![
 			bincode::serialize(&HeaderPacketType::DataEnc).expect("Unable to serialize packet type"),
 			(encryption_method as u32).to_le_bytes().to_vec(),
@@ -111,7 +112,7 @@ impl Header {
 	}
 
 	/// Constructs an edit list packet
-	pub fn make_packet_data_edit_list(edit_list: Vec<usize>) -> Vec<u8> {
+	pub fn make_data_edit_list(edit_list: Vec<usize>) -> Vec<u8> {
 		vec![
 			bincode::serialize(&HeaderPacketType::EditList).unwrap(),
 			(edit_list.len() as u32).to_le_bytes().to_vec(),
@@ -204,6 +205,29 @@ impl Header {
 		]
 		.concat()
 	}
+
+	/// Deserializes the data info from the header bytes.
+	///
+	/// Reads the magic number, the version and the number of packets from the input bytes.
+	pub fn deserialize(&self,
+		header: Bytes,
+		keys: Vec<KeyPair>,
+		sender_pubkey: &Option<Vec<u8>>
+	) -> Result<Header, Crypt4GHError> {
+		let header_info =
+			bincode::deserialize::<Header>(header.bytes()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
+
+		if &header_info.magic_number != MAGIC_NUMBER {
+			return Err(Crypt4GHError::MagicStringError);
+		}
+
+		if header_info.version != VERSION {
+			return Err(Crypt4GHError::InvalidCrypt4GHVersion(header_info.version));
+		}
+
+		Ok(header_info)
+	}
+
 
 	pub fn decrypt(
 		&mut self,
@@ -382,27 +406,6 @@ impl Header {
 		// })
 	}
 
-	/// Deserializes the data info from the header bytes.
-	///
-	/// Reads the magic number, the version and the number of packets from the input bytes.
-	pub fn deserialize(&self,
-		header: Bytes,
-		keys: Vec<KeyPair>,
-		sender_pubkey: &Option<Vec<u8>>
-	) -> Result<Header, Crypt4GHError> {
-		let header_info =
-			bincode::deserialize::<Header>(header.bytes()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
-
-		if &header_info.magic_number != MAGIC_NUMBER {
-			return Err(Crypt4GHError::MagicStringError);
-		}
-
-		if header_info.version != VERSION {
-			return Err(Crypt4GHError::InvalidCrypt4GHVersion(header_info.version));
-		}
-
-		Ok(header_info)
-	}
 
 	/// Reencrypts the header.
 	///
@@ -530,6 +533,30 @@ impl Header {
 			.collect::<Result<Vec<Vec<u8>>, Crypt4GHError>>()?;
 
 		Ok((final_packets, segment_oracle))
+	}
+
+	/// Builds a header with a random session key
+	///
+	/// Returns the encrypted header bytes
+	pub fn encrypt_header(
+		recipient_keys: &HashSet<keys::KeyPairInfo>,
+		session_key: SessionKeys,
+	) -> Result<Vec<u8>, Crypt4GHError> {
+		let encryption_method = 0;
+		
+		let session_key_or_new = session_key.map_or_else(|| {
+			let mut session_key = [0_u8; 32];
+			let mut rnd = rand_chacha::ChaCha20Rng::from_entropy();
+
+			rnd.try_fill_bytes(&mut session_key).map_err(|_| Crypt4GHError::NoRandomNonce)?; // TODO: Custom error for this
+
+			Ok::<_, Crypt4GHError>(session_key)
+		}, |value| { Ok(value)} )?;
+
+		let header_content = header::make_packet_data_enc(encryption_method, &session_key_or_new);
+		let header_packets = header::encrypt(&header_content, recipient_keys)?;
+		let header_bytes = header::serialize(header_packets);
+		Ok(header_bytes)
 	}
 }
 

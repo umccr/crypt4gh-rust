@@ -29,6 +29,7 @@ pub mod reader;
 pub mod util;
 pub mod header;
 pub mod keys;
+pub mod encrypted_data;
 pub mod error;
 
 use bytes::Bytes;
@@ -45,17 +46,14 @@ use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{ self, ChaCha20Poly1305, Key, KeyInit, Nonce };
 
 use crate::error::Crypt4GHError;
+use crate::header::Header;
 
 use decrypter::data_block::{ DecryptedDataBlock, DecryptedBytes };
 use keys::KeyPairInfo;
-use header::{ HeaderInfo, deserialize_header_info };
+//use header::{ HeaderInfo, deserialize_header_info };
 
 const CHUNK_SIZE: usize = 4096;
 
-/// Size of the encrypted segments.
-pub const SEGMENT_SIZE: usize = 65_536;
-const CIPHER_DIFF: usize = 28;
-const CIPHER_SEGMENT_SIZE: usize = SEGMENT_SIZE + CIPHER_DIFF;
 
 /// Write buffer wrapper.
 /// * offset: Start writing on position = `offset`
@@ -212,29 +210,6 @@ impl<'a, W: Write> WriteInfo<'a, W> {
 // 	Ok(())
 // }
 
-/// Builds a header with a random session key
-///
-/// Returns the encrypted header bytes
-pub fn encrypt_header(
-	recipient_keys: &HashSet<keys::KeyPairInfo>,
-	session_key: SessionKeys,
-) -> Result<Vec<u8>, Crypt4GHError> {
-	let encryption_method = 0;
-	
-	let session_key_or_new = session_key.map_or_else(|| {
-		let mut session_key = [0_u8; 32];
-		let mut rnd = rand_chacha::ChaCha20Rng::from_entropy();
-
-		rnd.try_fill_bytes(&mut session_key).map_err(|_| Crypt4GHError::NoRandomNonce)?; // TODO: Custom error for this
-
-		Ok::<_, Crypt4GHError>(session_key)
-	}, |value| { Ok(value)} )?;
-
-	let header_content = header::make_packet_data_enc(encryption_method, &session_key_or_new);
-	let header_packets = header::encrypt(&header_content, recipient_keys)?;
-	let header_bytes = header::serialize(header_packets);
-	Ok(header_bytes)
-}
 
 /// Encrypts a segment.
 ///
@@ -554,7 +529,7 @@ pub fn reencrypt<R: Read, W: Write>(
 	read_buffer
 		.read_exact(&mut temp_buf)
 		.map_err(|e| Crypt4GHError::ReadHeaderError(e.into()))?;
-	let header_info: HeaderInfo = deserialize_header_info((&temp_buf).to_vec())?;
+	let header = Header::from((&temp_buf).to_vec())?;
 
 	// Calculate header packets
 	let header_packets = (0..header_info.packets_count)

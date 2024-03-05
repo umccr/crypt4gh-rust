@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
 
-use crate::header::HeaderInfo;
+use crate::decoder::DecodedBlock::HeaderInfo;
 use crate::keys::KeyPairInfo;
 use futures::ready;
 use futures::stream::TryBuffered;

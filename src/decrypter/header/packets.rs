@@ -42,8 +42,7 @@ impl HeaderPacketsDecrypter {
   ) -> Result<Header, Crypt4GHError> {
     let header = Header::new_from_bytes(header_packets.as_slice());
 
-
-    Ok(deserialize_header_info(
+    Ok(header.deserialize(
       header_packets
         .into_iter()
         .map(|bytes| bytes.to_vec())
