@@ -23,27 +23,38 @@ use crate::keys::KeyPairInfo;
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
 
+pub struct Magic([u8; 8]);
+
 /// Structs below follow crypt4gh spec §2.2
 /// 
 /// Header precedes data blocks and is described in crypt4gh spec §3.2 and §2.2 for a high level graphical representation of
 /// the file structure. 
 pub struct Header {
-	magic: [u8; 8], 
+	magic: Magic,
 	version: u32,
 	count: u32,
 	packets: Vec<HeaderPacket>
 }
 
-/// Encodes actual encrypted data from a header packet or an edit list. 
-#[derive(Serialize, Deserialize, PartialEq)]
-enum HeaderPacketType {
-	DataEnc,
-	EditList
+pub enum EncryptedPacketData {
+	DataEncryptionKey(DataEncryptionKeyPacket),
+	EditList(EditListPacket)
+}
+
+struct DataEncryptionKeyPacket {
+	encryption_method: u32,
+	data_encryption_key: Vec<u8>
+}
+
+struct EditListPacket {
+	number_lengths: u32,
+	lengths: Vec<u64>
 }
 
 /// Data-bearing Header Packet data type as it can hold either depending on packet type
 enum HeaderPacketDataType {
-	Packet {DataEncryptionPacket: Vec<u8>, EditListPacket: Vec<u8> }
+	EditListPacket(Vec<u8>),
+	DataPacketEncrypted(Vec<u8>),
 }
 
 /// As described in crypt4gh spec §3.2.1 
@@ -56,22 +67,34 @@ pub struct HeaderPacket {
 	mac: Bytes //dalek::Mac type might be more fitting
 }
 
-pub struct EncryptedPacketData {
-	packet_type: HeaderPacketType,
-	packet_data: HeaderPacketDataType
-}
+// /// Encodes actual encrypted data from a header packet or an edit list.
+// #[derive(Serialize, Deserialize, PartialEq)]
+// enum HeaderPacketType {
+// 	DataEnc,
+// 	EditList
+// }
+//
+// /// Data-bearing Header Packet data type as it can hold either depending on packet type
+// enum HeaderPacketDataType {
+// 	Packet {DataEncryptionPacket: Vec<u8>, EditListPacket: Vec<u8> }
+// }
 
-/// This packet contains the parameters needed to decrypt the data part of the file. As described in crypt4gh spec §3.2.3
-struct DataEncryptionPacket {
-	encryption_method: EncryptionMethod,
-	data_encryption_key: PrivateKey
-}
+// pub struct EncryptedPacketData {
+// 	packet_type: HeaderPacketType,
+// 	packet_data: HeaderPacketDataType
+// }
 
-/// This packet contains a list of edits that should be applied to the plain-text data following decryption. As described in crypt4gh spec §3.2.4
-struct EditListPacket {
-	number_lengths: Vec<u8>,
-	lengths: Vec<u8>
-}
+// /// This packet contains the parameters needed to decrypt the data part of the file. As described in crypt4gh spec §3.2.3
+// struct DataEncryptionPacket {
+// 	encryption_method: EncryptionMethod,
+// 	data_encryption_key: PrivateKey
+// }
+//
+// /// This packet contains a list of edits that should be applied to the plain-text data following decryption. As described in crypt4gh spec §3.2.4
+// struct EditListPacket {
+// 	number_lengths: Vec<u8>,
+// 	lengths: Vec<u8>
+// }
 
 /// Implements all header-related operations described in crypt4gh spec §3.2 and onwards
 impl Header {
