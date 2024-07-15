@@ -5,7 +5,7 @@ use tokio_util::codec::Decoder;
 
 use crate::{error::Crypt4GHError::{
   self, MaximumHeaderSize, NumericConversionError, SliceConversionError
-}, header::HeaderPacket};
+}, header::HeaderPacket, header::Header};
 pub const ENCRYPTED_BLOCK_SIZE: usize = 65536;
 pub const NONCE_SIZE: usize = 12; // ChaCha20 IETF Nonce size
 pub const MAC_SIZE: usize = 16;

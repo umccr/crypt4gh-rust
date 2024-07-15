@@ -1,3 +1,5 @@
+/// Implementation of Crypt4GH spec "Encrypted Data" §3.4.
+
 use crate::keys::EncryptionMethod;
 
 /// Size of the encrypted segments.
@@ -5,6 +7,8 @@ pub const SEGMENT_SIZE: usize = 65_536;
 const CIPHER_DIFF: usize = 28;
 const CIPHER_SEGMENT_SIZE: usize = SEGMENT_SIZE + CIPHER_DIFF;
 
+
+// §3.4.2 Segmenting the input
 struct Segment {
     pub data: Chacha20IetfPoly1305Segment<EncryptionMethod>
 }

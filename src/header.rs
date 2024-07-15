@@ -8,9 +8,8 @@ use chacha20poly1305::aead::Aead;
 use chacha20poly1305::aead::OsRng;
 use chacha20poly1305::Nonce;
 use chacha20poly1305::{self, aead, ChaCha20Poly1305, KeyInit, AeadCore};
-use crypto_kx::{SecretKey, PublicKey, Keypair};
+use crypto_kx::{SecretKey, Keypair};
 
-use curve25519_dalek::digest::Mac;
 use serde::{Deserialize, Serialize};
 use ssh_key::PrivateKey;
 
@@ -19,6 +18,7 @@ use crate::error::Crypt4GHError;
 use crate::keys::EncryptionMethod;
 use crate::keys::KeyPair;
 use crate::keys::KeyPairInfo;
+use crate::keys::PublicKey;
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -27,6 +27,7 @@ const VERSION: u32 = 1;
 /// 
 /// Header precedes data blocks and is described in crypt4gh spec §3.2 and §2.2 for a high level graphical representation of
 /// the file structure. 
+#[derive(Debug)]
 pub struct Header {
 	magic: [u8; 8], 
 	version: u32,
@@ -35,18 +36,20 @@ pub struct Header {
 }
 
 /// Encodes actual encrypted data from a header packet or an edit list. 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 enum HeaderPacketType {
 	DataEnc,
 	EditList
 }
 
 /// Data-bearing Header Packet data type as it can hold either depending on packet type
+#[derive(Debug)]
 enum HeaderPacketDataType {
 	Packet {DataEncryptionPacket: Vec<u8>, EditListPacket: Vec<u8> }
 }
 
-/// As described in crypt4gh spec §3.2.1 
+/// As described in crypt4gh spec §3.2.1
+#[derive(Debug)]
 pub struct HeaderPacket {
 	packet_length: u32,
 	encryption_method: EncryptionMethod, 
@@ -56,6 +59,7 @@ pub struct HeaderPacket {
 	mac: Bytes //dalek::Mac type might be more fitting
 }
 
+#[derive(Debug)]
 pub struct EncryptedPacketData {
 	packet_type: HeaderPacketType,
 	packet_data: HeaderPacketDataType
@@ -86,12 +90,12 @@ impl Header {
 
 	/// Get the size of all the packets.
 	pub fn length(&self) -> u64 {
-		self.length
+		unimplemented!()
 	}
 
 	/// Get the inner bytes and size.
 	pub fn into_inner(self) -> (Vec<HeaderPacket>, u64) {
-		(self.packets, self.length)
+		unimplemented!()
 	}
 
 	// FIXME: implement default
@@ -217,7 +221,7 @@ impl Header {
 		let header_info =
 			bincode::deserialize::<Header>(header.bytes()).map_err(|e| Crypt4GHError::ReadHeaderError(e))?;
 
-		if &header_info.magic_number != MAGIC_NUMBER {
+		if &header_info.magic != MAGIC_NUMBER {
 			return Err(Crypt4GHError::MagicStringError);
 		}
 
