@@ -1,6 +1,7 @@
 pub mod builder;
 pub mod data_block;
 pub mod header;
+pub mod reader;
 
 use std::cmp::min;
 use std::io::SeekFrom;
@@ -8,7 +9,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use crate::header::{EncryptedHeaderPacketBytes, HeaderInfo};
 use crate::keys::{KeyPair, KeyPairInfo};
 use futures::ready;
 use futures::Stream;
@@ -16,11 +16,9 @@ use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt};
 use tokio_util::codec::FramedRead;
 
-use crate::decoder::Block;
-use crate::decoder::DecodedBlock;
-use crate::decrypter::data_block::DataBlockDecrypter;
-use crate::decrypter::header::packets::HeaderPacketsDecrypter;
-use crate::decrypter::header::SessionKeysFuture;
+use crate::decrypt::data_block::DataBlockDecrypter;
+use crate::decrypt::header::packets::HeaderPacketsDecrypter;
+use crate::decrypt::header::SessionKeysFuture;
 use crate::error::Crypt4GHError;
 use crate::{util, keys::PublicKey};
 
@@ -28,7 +26,7 @@ use futures::Future;
 
 pin_project! {
     /// A decrypter for an entire AsyncRead Crypt4GH file.
-    pub struct DecrypterStream<R> {
+    pub struct DecryptStream<R> {
         #[pin]
         inner: FramedRead<R, Block>,
         #[pin]
@@ -370,39 +368,39 @@ where
   }
 }
 
-// impl<R> DecrypterStream<R>
-// where
-//   R: AsyncRead + AsyncSeek + Unpin + Send,
-// {
-//   /// Seek to a position in the encrypted stream.
-//   pub async fn seek_encrypted(&mut self, position: SeekFrom) -> io::Result<u64> {
-//     // Make sure that session keys are polled.
-//     self.read_header().await?;
+impl<R> DecrypterStream<R>
+where
+  R: AsyncRead + AsyncSeek + Unpin + Send,
+{
+  /// Seek to a position in the encrypted stream.
+  pub async fn seek_encrypted(&mut self, position: SeekFrom) -> io::Result<u64> {
+    // Make sure that session keys are polled.
+    self.read_header().await?;
 
-//     // First poll to the position specified.
-//     let seek = self.inner.get_mut().seek(position).await?;
+    // First poll to the position specified.
+    let seek = self.inner.get_mut().seek(position).await?;
 
-//     // Then advance to the correct data block position.
-//     let advance = self.advance_encrypted(seek).await?;
+    // Then advance to the correct data block position.
+    let advance = self.advance_encrypted(seek).await?;
 
-//     // Then seek to the correct position.
-//     let seek = self.inner.get_mut().seek(SeekFrom::Start(advance)).await?;
-//     self.inner.read_buffer_mut().clear();
+    // Then seek to the correct position.
+    let seek = self.inner.get_mut().seek(SeekFrom::Start(advance)).await?;
+    self.inner.read_buffer_mut().clear();
 
-//     Ok(seek)
-//   }
+    Ok(seek)
+  }
 
-//   /// Seek to a position in the unencrypted stream.
-//   pub async fn seek_unencrypted(&mut self, position: u64) -> io::Result<u64> {
-//     // Make sure that session keys are polled.
-//     self.read_header().await?;
+  /// Seek to a position in the unencrypted stream.
+  pub async fn seek_unencrypted(&mut self, position: u64) -> io::Result<u64> {
+    // Make sure that session keys are polled.
+    self.read_header().await?;
 
-//     // Convert to an encrypted position and seek
-//     let position = self
-//       .to_encrypted(position)
-//       .ok_or_else(|| Crypt4GHError("Unable to convert to encrypted position.".to_string()))?;
+    // Convert to an encrypted position and seek
+    let position = self
+      .to_encrypted(position)
+      .ok_or_else(|| Crypt4GHError("Unable to convert to encrypted position.".to_string()))?;
 
-//     // Then do the seek.
-//     self.seek_encrypted(SeekFrom::Start(position)).await
-//   }
-// }
+    // Then do the seek.
+    self.seek_encrypted(SeekFrom::Start(position)).await
+  }
+}

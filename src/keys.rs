@@ -7,7 +7,7 @@ const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
 use crate::error::Crypt4GHError;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum EncryptionMethod {
+pub enum EncryptionMethod { // TODO: Spec says u32 for this enum, how to encode?
   X25519Chacha20Poly305,
   Aes256Gcm
 }

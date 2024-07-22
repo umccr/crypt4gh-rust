@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
 
-use crate::decoder::DecodedBlock::HeaderInfo;
+use crate::decrypt::reader::decode::DecodedBlock::HeaderInfo;
 use crate::keys::KeyPairInfo;
 use futures::ready;
 use futures::stream::TryBuffered;
@@ -11,21 +11,22 @@ use futures::Stream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncBufRead, AsyncRead, AsyncSeek, ReadBuf};
 
-use crate::decoder::Block;
+use crate::decrypt::reader::decode::Block;
 use crate::error::Crypt4GHError::{self, NumericConversionError};
-use crate::reader::builder::Builder;
+use crate::decrypt::reader::builder::Builder;
 use crate::{DecryptedDataBlock, header::EncryptedHeaderPacketBytes};
 
-use super::decrypter::DecrypterStream;
+use crate::decrypt::DecryptStream;
 
 pub mod builder;
+pub(crate) mod decode;
 
 pin_project! {
     pub struct Reader<R>
       where R: AsyncRead
     {
       #[pin]
-      stream: TryBuffered<DecrypterStream<R>>,
+      stream: TryBuffered<DecryptStream<R>>,
       current_block: DecryptedDataBlock,
       // The current position in the decrypted buffer.
       buf_position: usize,
@@ -116,11 +117,11 @@ where
   }
 }
 
-impl<R> From<DecrypterStream<R>> for Reader<R>
+impl<R> From<DecryptStream<R>> for Reader<R>
 where
   R: AsyncRead,
 {
-  fn from(stream: DecrypterStream<R>) -> Self {
+  fn from(stream: DecryptStream<R>) -> Self {
     Builder::default().build_with_stream(stream)
   }
 }

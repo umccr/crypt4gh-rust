@@ -1,8 +1,8 @@
 use std::cmp::min;
 
-use crate::decoder::Block;
-use crate::error::Crypt4GHError;
-use crate::keys::{KeyPair, PublicKey};
+use crate::decrypt::reader::decode::Block;
+// use crate::error::Crypt4GHError;
+// use crate::keys::{KeyPair, PublicKey};
 
 fn to_current_data_block(pos: u64, header_len: u64) -> u64 {
   header_len + (pos / Block::encrypted_block_size()) * Block::standard_data_block_size()

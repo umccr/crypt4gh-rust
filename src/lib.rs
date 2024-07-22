@@ -21,23 +21,18 @@
 	clippy::redundant_else
 )]
 
-pub mod decoder;
-pub mod decrypter;
-//pub mod encrypter;
+pub mod decrypt;
+pub mod encrypt;
 pub mod edit_lists;
-pub mod reader;
 pub mod util;
 pub mod header;
 pub mod keys;
-pub mod encrypted_data;
 pub mod error;
 
 use bytes::Bytes;
-use decrypter::DecrypterStream;
+use crate::decrypt::DecrypterStream;
 use io::Cursor;
 use keys::SessionKeys;
-use rand::{SeedableRng, RngCore};
-use rand_chacha;
 
 use std::collections::HashSet;
 use std::io::{self, Read, Write};
@@ -48,7 +43,7 @@ use chacha20poly1305::{ self, ChaCha20Poly1305, Key, KeyInit, Nonce };
 use crate::error::Crypt4GHError;
 use crate::header::Header;
 
-use decrypter::data_block::{ DecryptedDataBlock, DecryptedBytes };
+use crate::decrypt::data_block::{ DecryptedDataBlock, DecryptedBytes };
 use keys::KeyPairInfo;
 //use header::{ HeaderInfo, deserialize_header_info };
 

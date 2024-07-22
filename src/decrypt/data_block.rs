@@ -9,7 +9,7 @@ use crate::{body_decrypt, WriteInfo};
 use pin_project_lite::pin_project;
 use tokio::task::JoinHandle;
 
-use crate::decrypter::DecrypterStream;
+use crate::decrypt::DecryptStream;
 use crate::error::Crypt4GHError::{self, JoinHandleError};
 
 pin_project! {
@@ -137,7 +137,7 @@ impl DataBlockDecrypter {
     let mut decrypted_bytes: Bytes = write_buf.into_inner().into();
     let mut edited_bytes = Bytes::new();
 
-    let edits = DecrypterStream::<()>::create_internal_edit_list(edit_list_packet)
+    let edits = DecryptStream::<()>::create_internal_edit_list(edit_list_packet)
       .unwrap_or(vec![(false, decrypted_bytes.len() as u64)]);
     if edits.iter().map(|(_, edit)| edit).sum::<u64>() > decrypted_bytes.len() as u64 {
       return Err(Crypt4GHError::InvalidEditList);

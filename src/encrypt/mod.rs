@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use crypt4gh::header::HeaderInfo;
+use crate::encrypt::header::HeaderInfo;
 use crypt4gh::Keys;
 use futures::ready;
 use futures::Stream;
@@ -18,17 +18,17 @@ use tokio_util::codec::FramedRead;
 use crate::advance::Advance;
 use crate::decoder::Block;
 use crate::decoder::DecodedBlock;
-use crate::decrypter::data_block::DataBlockDecrypter;
-use crate::decrypter::header::packets::HeaderPacketsDecrypter;
-use crate::decrypter::header::SessionKeysFuture;
-use crate::error::Error::Crypt4GHError;
-use crate::error::Result;
+use crate::decrypt::data_block::DataBlockDecrypter;
+use crate::decrypt::header::packets::HeaderPacketsDecrypter;
+use crate::decrypt::header::SessionKeysFuture;
+use crate::error::Crypt4GHError;
 use crate::EncryptedHeaderPacketBytes;
 use crate::{util, PublicKey};
 
 pub mod builder;
 pub mod data_block;
 pub mod header;
+pub mod encrypted_data;
 
 pin_project! {
     /// A decrypter for an entire AsyncRead Crypt4GH file.

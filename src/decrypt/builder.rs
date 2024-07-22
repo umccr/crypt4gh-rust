@@ -1,10 +1,10 @@
-use crypt4gh::Keys;
+use crate::error::Crypt4GHError;
+use crate::keys::{KeyPair, KeyPairInfo};
 use tokio::io::{AsyncRead, AsyncSeek};
 use tokio_util::codec::FramedRead;
 
-use crate::decrypter::DecrypterStream;
-use crate::error::Result;
-use crate::PublicKey;
+use crate::decrypt::DecryptStream;
+use crate::keys::PublicKey;
 
 /// An decrypter reader builder.
 #[derive(Debug, Default)]
@@ -49,18 +49,18 @@ impl Builder {
   }
 
   /// Build the decrypter.
-  pub fn build<R>(self, inner: R, keys: Vec<Keys>) -> DecrypterStream<R>
+  pub fn build<R>(self, inner: R, keys: Vec<KeyPairInfo>) -> DecryptStream<R>
   where
     R: AsyncRead,
   {
-    DecrypterStream {
+    DecryptStream {
       inner: FramedRead::new(inner, Default::default()),
       header_packet_future: None,
       keys,
       sender_pubkey: self.sender_pubkey,
       session_keys: vec![],
       encrypted_header_packets: None,
-      edit_list_packet: DecrypterStream::<()>::create_internal_edit_list(self.edit_list),
+      edit_list_packet: DecryptStream::<()>::create_internal_edit_list(self.edit_list),
       header_info: None,
       header_length: None,
       current_block_size: None,
@@ -78,8 +78,8 @@ impl Builder {
   pub async fn build_with_stream_length<R>(
     self,
     inner: R,
-    keys: Vec<Keys>,
-  ) -> Result<DecrypterStream<R>>
+    keys: Vec<KeyPairInfo>,
+  ) -> Result<DecryptStream<R>, Crypt4GHError>
   where
     R: AsyncRead + AsyncSeek + Unpin,
   {

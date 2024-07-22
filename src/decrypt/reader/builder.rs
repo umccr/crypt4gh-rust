@@ -5,8 +5,8 @@ use crate::keys::KeyPairInfo;
 use futures_util::TryStreamExt;
 use tokio::io::{AsyncRead, AsyncSeek};
 
-use crate::decrypter::builder::Builder as DecrypterBuilder;
-use crate::decrypter::DecrypterStream;
+use crate::decrypt::builder::Builder as DecrypterBuilder;
+use crate::decrypt::DecryptStream;
 use crate::keys::PublicKey;
 
 use super::Reader;
@@ -89,7 +89,7 @@ impl Builder {
   }
 
   /// Build the Crypt4GH reader with a decryper stream.
-  pub fn build_with_stream<R>(self, stream: DecrypterStream<R>) -> Reader<R>
+  pub fn build_with_stream<R>(self, stream: DecryptStream<R>) -> Reader<R>
   where
     R: AsyncRead,
   {

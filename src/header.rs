@@ -12,11 +12,12 @@ use crypto_kx::{SecretKey, Keypair};
 
 use serde::{Deserialize, Serialize};
 
-use crate::encrypted_data::SEGMENT_SIZE;
+use crate::encrypt::encrypted_data::SEGMENT_SIZE;
 use crate::error::Crypt4GHError;
 use crate::keys::EncryptionMethod;
 use crate::keys::KeyPair;
 use crate::keys::KeyPairInfo;
+use crate::keys::PrivateKey;
 use crate::keys::PublicKey;
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
@@ -42,16 +43,19 @@ enum HeaderPacketType {
 	DataEnc,
 	EditList
 }
-pub enum EncryptedPacketData {
-	DataEncryptionKey(DataEncryptionKeyPacket),
-	EditList(EditListPacket)
-}
 
+#[derive(Debug)]
 struct DataEncryptionKeyPacket {
 	encryption_method: u32,
 	data_encryption_key: Vec<u8>
 }
 
+/// Crypt4gh spec §3.2.4
+/// 
+/// TODO: Enforce this:
+/// 
+/// It is not permitted to have more than one edit list. If more than one edit list is present, the file SHOULD
+/// be rejected.
 struct EditListPacket {
 	number_lengths: u32,
 	lengths: Vec<u64>
@@ -64,50 +68,41 @@ enum HeaderPacketDataType {
 	DataPacketEncrypted(Vec<u8>),
 }
 
-/// As described in crypt4gh spec §3.2.1
+/// Crypt4gh spec §3.2.1
+/// 
+/// Conditional settings for writer_public_key/nonce/mac depending on
+/// as described in the spec can be selected at runtime
 #[derive(Debug)]
 pub struct HeaderPacket {
 	packet_length: u32,
 	encryption_method: EncryptionMethod, 
-	writer_pubkey: PublicKey,
+	writer_public_key: PublicKey,
 	nonce: Nonce,
-	encrypted_packet_data: EncryptedPacketData,
+	encrypted_payload: EncryptedPacketData,
 	mac: Bytes //dalek::Mac type might be more fitting
+			   // TODO: MAC[16] for chacha20_ietf_poly1305
 }
 
-// #[derive(Debug)]
-// pub struct EncryptedPacketData {
-// 	packet_type: HeaderPacketType,
-// 	packet_data: HeaderPacketDataType
-// }
-// /// Encodes actual encrypted data from a header packet or an edit list.
-// #[derive(Serialize, Deserialize, PartialEq)]
-// enum HeaderPacketType {
-// 	DataEnc,
-// 	EditList
-// }
-//
-// /// Data-bearing Header Packet data type as it can hold either depending on packet type
-// enum HeaderPacketDataType {
-// 	Packet {DataEncryptionPacket: Vec<u8>, EditListPacket: Vec<u8> }
-// }
+/// Crypt4gh spec §3.2.2
+#[derive(Debug)]
+pub struct EncryptedHeaderPacket {
+	packet_type: HeaderPacketType,
+	data_key: Bytes, // TODO: data_key[32] on the spec
+					 // for chacha20_ietf_poly1305
+	data_edit_list: EditListPacket,
+}
 
-// pub struct EncryptedPacketData {
-// 	packet_type: HeaderPacketType,
-// 	packet_data: HeaderPacketDataType
-// }
-
-// /// This packet contains the parameters needed to decrypt the data part of the file. As described in crypt4gh spec §3.2.3
-// struct DataEncryptionPacket {
-// 	encryption_method: EncryptionMethod,
-// 	data_encryption_key: PrivateKey
-// }
-//
-// /// This packet contains a list of edits that should be applied to the plain-text data following decryption. As described in crypt4gh spec §3.2.4
-// struct EditListPacket {
-// 	number_lengths: Vec<u8>,
-// 	lengths: Vec<u8>
-// }
+/// Crypt4gh spec §3.2.3
+/// 
+/// TODO: Make clear decision on how to enforce this:
+/// 
+/// To allow parts of the data to be encrypted with different Kdata keys, more than one of this packet type may
+/// be present. If there is more than one, the data encryption method MUST be the same for all of them to
+/// prevent problems with random access in the encrypted file.
+struct DataEncryptionPacket {
+	encryption_method: EncryptionMethod,
+	data_key: PrivateKey,
+}
 
 /// Implements all header-related operations described in crypt4gh spec §3.2 and onwards
 impl Header {

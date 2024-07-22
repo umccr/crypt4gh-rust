@@ -4,27 +4,27 @@ use std::task::{Context, Poll};
 
 use tokio::io::AsyncRead;
 
-use crate::encrypter::EncrypterStream;
-use crate::encrypter::Result;
+use crate::decrypt::DecryptStream;
+use crate::error::Crypt4GHError;
 
 pub mod packets;
 
-/// A struct which will poll an encrypter stream until the session keys are found.
-/// After polling the future, the underlying encrypter stream should have processed
+/// A struct which will poll a decrypter stream until the session keys are found.
+/// After polling the future, the underlying decrypter stream should have processed
 /// the session keys.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct SessionKeysFuture<'a, R> {
-  handle: &'a mut EncrypterStream<R>,
+  handle: &'a mut DecryptStream<R>,
 }
 
 impl<'a, R> SessionKeysFuture<'a, R> {
   /// Create the future.
-  pub fn new(handle: &'a mut EncrypterStream<R>) -> Self {
+  pub fn new(handle: &'a mut DecryptStream<R>) -> Self {
     Self { handle }
   }
 
   /// Get the inner handle.
-  pub fn get_mut(&mut self) -> &mut EncrypterStream<R> {
+  pub fn get_mut(&mut self) -> &mut DecryptStream<R> {
     self.handle
   }
 }
@@ -33,7 +33,7 @@ impl<'a, R> Future for SessionKeysFuture<'a, R>
 where
   R: AsyncRead + Unpin,
 {
-  type Output = Result<()>;
+  type Output = Result<(), Crypt4GHError>;
 
   fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
     self.handle.poll_session_keys_unpin(cx)

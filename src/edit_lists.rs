@@ -6,7 +6,7 @@ use crate::keys::PrivateKey;
 use tokio::io::AsyncRead;
 
 use crate::error::Crypt4GHError;
-use crate::reader::Reader;
+use crate::decrypt::reader::Reader;
 use crate::keys::PublicKey;
 
 /// Unencrypted byte range positions. Contains inclusive start values and exclusive end values.
