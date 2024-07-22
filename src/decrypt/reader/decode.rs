@@ -29,7 +29,7 @@ const MAX_HEADER_SIZE: usize = 8 * 1024 * 1024;
 pub enum DecodedBlock {
   /// The magic string, version string and header packet count.
   /// Corresponds to `deconstruct_header_info`.
-  HeaderInfo(Header),
+  Header(Header),
   /// Header packets, both data encryption key packets and a data edit list packets.
   /// Corresponds to `deconstruct_header_body`.
   HeaderPackets(HeaderPacket),
@@ -42,7 +42,7 @@ pub enum DecodedBlock {
 #[derive(Debug)]
 enum BlockState {
   /// Expecting header info.
-  HeaderInfo,
+  Header,
   /// Expecting header packets and the number of header packets left to decode.
   HeaderPackets(u32),
   /// Expecting a data block.
@@ -58,7 +58,7 @@ pub struct Block {
 }
 
 impl Block {
-  fn get_header_info(src: &mut BytesMut) -> Result<HeaderInfo, Crypt4GHError> {
+  fn get_header_info(src: &mut BytesMut) -> Result<Header, Crypt4GHError> {
     deserialize_header_info(
       src
         .split_to(HEADER_INFO_SIZE)
@@ -84,7 +84,7 @@ impl Block {
 
     self.next_block = BlockState::HeaderPackets(header_info.packets_count);
 
-    Ok(Some(DecodedBlock::HeaderInfo(header_info)))
+    Ok(Some(DecodedBlock::Header(header_info)))
   }
 
   /// Decodes header packets, updates the state and returns a header packet block type.
@@ -197,7 +197,7 @@ impl Block {
 impl Default for Block {
   fn default() -> Self {
     Self {
-      next_block: BlockState::HeaderInfo,
+      next_block: BlockState::Header,
     }
   }
 }
@@ -208,7 +208,7 @@ impl Decoder for Block {
 
   fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Crypt4GHError> {
     match self.next_block {
-      BlockState::HeaderInfo => self.decode_header_info(src),
+      BlockState::Header => self.decode_header_info(src),
       BlockState::HeaderPackets(header_packets) => self.decode_header_packets(src, header_packets),
       BlockState::DataBlock => self.decode_data_block(src),
       BlockState::Eof => Ok(None),

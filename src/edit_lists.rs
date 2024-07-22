@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::header::{encrypt, make_packet_data_edit_list, HeaderInfo};
+use crate::header::{encrypt, make_packet_data_edit_list, Header};
 use crate::keys::KeyPairInfo;
 use crate::keys::PrivateKey;
 use tokio::io::AsyncRead;
@@ -205,7 +205,7 @@ where
         self.reader.encrypted_header_packets(),
       ) {
         (
-          HeaderInfo {
+          Header {
             magic_number: header_info.magic_number,
             version: header_info.version,
             packets_count: header_info.packets_count,

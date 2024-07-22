@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{cmp, io};
 
-use crate::decrypt::reader::decode::DecodedBlock::HeaderInfo;
+use crate::decrypt::reader::decode::DecodedBlock::Header;
 use crate::keys::KeyPairInfo;
 use futures::ready;
 use futures::stream::TryBuffered;
@@ -89,7 +89,7 @@ where
   }
 
   /// Get the header info.
-  pub fn header_info(&self) -> Option<&HeaderInfo> {
+  pub fn header_info(&self) -> Option<&Header> {
     self.stream.get_ref().header_info()
   }
 

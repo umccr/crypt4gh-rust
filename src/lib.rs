@@ -30,7 +30,7 @@ pub mod keys;
 pub mod error;
 
 use bytes::Bytes;
-use crate::decrypt::DecrypterStream;
+use crate::decrypt::DecryptStream;
 use io::Cursor;
 use keys::SessionKeys;
 
@@ -45,7 +45,7 @@ use crate::header::Header;
 
 use crate::decrypt::data_block::{ DecryptedDataBlock, DecryptedBytes };
 use keys::KeyPairInfo;
-//use header::{ HeaderInfo, deserialize_header_info };
+//use header::{ Header, deserialize_header_info };
 
 const CHUNK_SIZE: usize = 4096;
 
@@ -584,7 +584,7 @@ pub fn rearrange<R: Read, W: Write>(
 	read_buffer
 		.read_exact(&mut temp_buf)
 		.map_err(|e| Crypt4GHError::ReadHeaderError(e.into()))?;
-	let header_info: HeaderInfo = deserialize_header_info((&temp_buf).to_vec())?;
+	let header_info: Header = deserialize_header_info((&temp_buf).to_vec())?;
 
 	// Calculate header packets
 	let header_packets = (0..header_info.packets_count)

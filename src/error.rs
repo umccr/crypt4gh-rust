@@ -161,7 +161,7 @@ pub enum Crypt4GHError {
 	#[error("converting between numeric types")]
 	NumericConversionError,
 	#[error("Decoding header info error")]
-	DecodingHeaderInfo,
+	DecodingHeader,
 	#[error("Decoding header packet error")]
 	DecodingHeaderPacket,
 	#[error("join handle error: `{0}`")]

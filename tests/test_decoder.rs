@@ -19,7 +19,7 @@ pub(crate) mod tests {
 
     // Assert that the first block output is a header info with one packet.
     assert!(
-      matches!(header_info, DecodedBlock::HeaderInfo(header_info) if header_info.packets_count == 1)
+      matches!(header_info, DecodedBlock::Header(header_info) if header_info.packets_count == 1)
     );
   }
 

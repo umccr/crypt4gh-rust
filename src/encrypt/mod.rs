@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use crate::encrypt::header::HeaderInfo;
+use crate::encrypt::header::Header;
 use crypt4gh::Keys;
 use futures::ready;
 use futures::Stream;
@@ -40,7 +40,7 @@ pin_project! {
         keys: Vec<Keys>,
         sender_pubkey: Option<PublicKey>,
         encrypted_header_packets: Option<Vec<EncryptedHeaderPacketBytes>>,
-        header_info: Option<HeaderInfo>,
+        header_info: Option<Header>,
         session_keys: Vec<Vec<u8>>,
         edit_list_packet: Option<Vec<(bool, u64)>>,
         header_length: Option<u64>,
@@ -151,7 +151,7 @@ where
     let mut this = self.as_mut().project();
     match ready!(this.inner.poll_next(cx)) {
       Some(Ok(buf)) => match buf {
-        DecodedBlock::HeaderInfo(header_info) => {
+        DecodedBlock::Header(header_info) => {
           // Store the header info but otherwise ignore it and poll again.
           *this.header_info = Some(header_info);
           cx.waker().wake_by_ref();
@@ -292,7 +292,7 @@ impl<R> DecrypterStream<R> {
   }
 
   /// Get the header info.
-  pub fn header_info(&self) -> Option<&HeaderInfo> {
+  pub fn header_info(&self) -> Option<&Header> {
     self.header_info.as_ref()
   }
 
@@ -354,7 +354,7 @@ where
 
     match ready!(item) {
       Some(Ok(buf)) => match buf {
-        DecodedBlock::HeaderInfo(_) | DecodedBlock::HeaderPackets(_) => {
+        DecodedBlock::Header(_) | DecodedBlock::HeaderPackets(_) => {
           // Session keys have already been read, so ignore the header info and header packets
           // and poll again
           cx.waker().wake_by_ref();
