@@ -12,13 +12,18 @@ use crypto_kx::{SecretKey, Keypair};
 
 use serde::{Deserialize, Serialize};
 
+use crate::decrypt;
+use crate::encrypt;
 use crate::encrypt::encrypted_data::SEGMENT_SIZE;
+use crate::encrypt::header;
 use crate::error::Crypt4GHError;
+use crate::keys;
 use crate::keys::EncryptionMethod;
 use crate::keys::KeyPair;
 use crate::keys::KeyPairInfo;
 use crate::keys::PrivateKey;
 use crate::keys::PublicKey;
+use crate::keys::SessionKeys;
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -78,7 +83,7 @@ pub struct HeaderPacket {
 	encryption_method: EncryptionMethod, 
 	writer_public_key: PublicKey,
 	nonce: Nonce,
-	encrypted_payload: EncryptedPacketData,
+	encrypted_payload: Bytes,
 	mac: Bytes //dalek::Mac type might be more fitting
 			   // TODO: MAC[16] for chacha20_ietf_poly1305
 }
@@ -103,6 +108,81 @@ struct DataEncryptionPacket {
 	encryption_method: EncryptionMethod,
 	data_key: PrivateKey,
 }
+
+
+/// FIXME: (MOVED from packets.rs) This should be probably moved to header.rs along with header as it only concerns Header ops?
+/// Since packets are not data blocks I think that for clarity it does not deserve its own file, but
+/// belongs to header.rs instead.
+
+/// A struct which will poll a decrypter stream until the session keys are found.
+/// After polling the future, the underlying decrypter stream should have processed
+/// the session keys.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+pub struct SessionKeysFuture<'a, R> {
+  handle: &'a mut DecryptStream<R>,
+}
+
+impl<'a, R> SessionKeysFuture<'a, R> {
+  /// Create the future.
+  pub fn new(handle: &'a mut DecryptStream<R>) -> Self {
+    Self { handle }
+  }
+
+  /// Get the inner handle.
+  pub fn get_mut(&mut self) -> &mut DecryptStream<R> {
+    self.handle
+  }
+}
+
+impl<'a, R> Future for SessionKeysFuture<'a, R>
+where
+  R: AsyncRead + Unpin,
+{
+  type Output = Result<(), Crypt4GHError>;
+
+  fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    self.handle.poll_session_keys_unpin(cx)
+  }
+}
+
+impl HeaderPacketsDecrypter {
+	pub fn new(
+	  header_packets: Vec<Bytes>,
+	  keys: Vec<KeyPairInfo>,
+	  sender_pubkey: Option<PublicKey>,
+	) -> Self {
+	  Self {
+		handle: spawn_blocking(|| {
+		  HeaderPacketsDecrypter::decrypt(header_packets, keys, sender_pubkey)
+		}),
+	  }
+	}
+  
+	pub fn decrypt(
+	  header_packets: Vec<Bytes>,
+	  keys: Vec<KeyPairInfo>,
+	  sender_pubkey: Option<PublicKey>,
+	) -> Result<Header, Crypt4GHError> {
+	  let header = Header::new_from_bytes(header_packets.as_slice());
+  
+	  Ok(header.deserialize(
+		header_packets
+		  .into_iter()
+		  .map(|bytes| bytes.to_vec())
+		  .collect(),
+		keys.as_slice(),
+		&sender_pubkey.map(|pubkey| pubkey.into_inner())
+	  ))
+	}
+  }
+  
+  impl Future for HeaderPacketsDecrypter {
+	type Output = Result<Header, Crypt4GHError>;
+  
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+	  self.project().handle.poll(cx).map_err(JoinHandleError)?
+	}
+  }
 
 /// Implements all header-related operations described in crypt4gh spec §3.2 and onwards
 impl Header {
@@ -212,7 +292,7 @@ impl Header {
 		keys.iter()
 			.filter(|key| key.method == 0)
 			.map(
-				|key| match encrypt_x25519_chacha20_poly1305(packet, &key.privkey, &key.recipient_pubkey) {
+				|key| match Self::encrypt_x25519_chacha20_poly1305(packet, &key.privkey, &key.recipient_pubkey) {
 					Ok(session_key) => Ok(vec![u32::from(key.method).to_le_bytes().to_vec(), session_key].concat()),
 					Err(e) => Err(e),
 				},
@@ -270,7 +350,7 @@ impl Header {
 		let mut ignored_packets = Vec::new();
 
 		for packet in encrypted_packets {
-			match decrypt_packet(&packet, keys, sender_pubkey) {
+			match Self::decrypt_packet(&packet, keys, sender_pubkey) {
 				Ok(decrypted_packet) => decrypted_packets.push(decrypted_packet),
 				Err(e) => {
 					log::warn!("Ignoring packet because: {}", e);
@@ -295,7 +375,7 @@ impl Header {
 
 			match packet_encryption_method {
 				0 => {
-					let plaintext_packet = decrypt_x25519_chacha20_poly1305(&packet[4..], &key.privkey, sender_pubkey);
+					let plaintext_packet = Self::decrypt_x25519_chacha20_poly1305(&packet[4..], &key.privkey, sender_pubkey);
 					//log::debug!("Decrypting packet: {:?}\n into plaintext packet: {:?}\n", &packet[8..], &plaintext_packet);
 					return plaintext_packet;
 				},
@@ -348,7 +428,7 @@ impl Header {
 		Ok(plaintext)
 	}
 
-	fn partition_packets(packets: Vec<Vec<u8>>) -> Result<HeaderPackets, Crypt4GHError> {
+	fn partition_packets(packets: Vec<Vec<u8>>) -> Result<Vec<HeaderPacket>, Crypt4GHError> {
 		let mut enc_packets = Vec::new();
 		let mut edits = None;
 
@@ -409,32 +489,31 @@ impl Header {
 		keys: &[KeyPairInfo],
 		sender_pubkey: &Option<Vec<u8>>,
 	) -> Result<Vec<HeaderPacket>, Crypt4GHError> {
-		let (packets, _) = decrypt(encrypted_packets, keys, sender_pubkey);
+		let (packets, _) = decrypt(encrypted_packets, keys, sender_pubkey)?;
 
 		if packets.is_empty() {
 			return Err(Crypt4GHError::NoSupportedEncryptionMethod);
 		}
 
-		let HeaderPackets {
+		let Vec<HeaderPacket> {
 			data_enc_packets,
 			edit_list_packet,
-		} = partition_packets(packets)?;
+		} = Self::partition_packets(packets)?;
 
 		let session_keys = data_enc_packets
 			.into_iter()
-			.map(|d| parse_enc_packet(&d))
+			.map(|d| Self::parse_enc_packet(&d))
 			.collect::<Result<Vec<_>, Crypt4GHError>>()?;
 
 		let edit_list = match edit_list_packet {
-			Some(packet) => Some(parse_edit_list_packet(&packet)?),
+			Some(packet) => Some(Self::parse_edit_list_packet(&packet)?),
 			None => None,
 		};
 
-		todo!()
-		// Ok(Vec<HeaderPacket> {
-		// 	data_enc_packets: session_keys,
-		// 	edit_list_packet: edit_list,
-		// })
+		Ok(Vec<HeaderPacket> {
+			data_enc_packets: session_keys,
+			edit_list_packet: edit_list,
+		})
 	}
 
 
@@ -450,7 +529,7 @@ impl Header {
 	) -> Result<Header, Crypt4GHError> {
 		log::info!("Reencrypting the header");
 
-		let (decrypted_packets, mut ignored_packets) = decrypt(header_packets, keys, &None);
+		let (decrypted_packets, mut ignored_packets) = decrypt(header_packets, keys, &None)?;
 
 		if decrypted_packets.is_empty() {
 			Err(Crypt4GHError::NoValidHeaderPacket)
@@ -502,7 +581,7 @@ impl Header {
 			return Err(Crypt4GHError::Done);
 		}
 
-		let (decrypted_packets, _) = decrypt(header_packets, &keys, sender_pubkey);
+		let (decrypted_packets, _) = decrypt(header_packets, &keys, sender_pubkey)?;
 
 		if decrypted_packets.is_empty() {
 			return Err(Crypt4GHError::NoValidHeaderPacket);

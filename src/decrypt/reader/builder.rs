@@ -2,6 +2,7 @@ use std::thread;
 
 use crate::error::Crypt4GHError;
 use crate::keys::KeyPairInfo;
+use futures::Stream;
 use futures_util::TryStreamExt;
 use tokio::io::{AsyncRead, AsyncSeek};
 
@@ -76,7 +77,7 @@ impl Builder {
   /// Build the reader and compute the stream length for seek operations.
   pub async fn build_with_stream_length<R>(self, inner: R, keys: Vec<KeyPairInfo>) -> Result<Reader<R>, Crypt4GHError>
   where
-    R: AsyncRead + AsyncSeek + Unpin,
+    R: AsyncRead + AsyncSeek + Unpin + Stream,
   {
     let stream_length = self.stream_length;
     let mut reader = self.build_with_reader(inner, keys);

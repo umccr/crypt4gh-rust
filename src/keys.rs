@@ -14,14 +14,14 @@ pub enum EncryptionMethod { // TODO: Spec says u32 for this enum, how to encode?
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 /// Key information.
-pub struct KeyPairInfo {
+pub struct KeyPair {
 	/// Method used for the key encryption.
 	/// > Only method 0 is supported.
 	pub method: EncryptionMethod,
 	/// Secret key of the encryptor / decryptor (your key).
-	pub privkey: PrivateKey,
+	pub private_key: PrivateKey,
 	/// Public key of the recipient (the key you want to encrypt for).
-	pub recipient_pubkey: PublicKey,
+	pub public_key: PublicKey,
 }
 
 pub struct SessionKeys {
@@ -40,17 +40,12 @@ pub struct PublicKey {
   pub bytes: Vec<u8>,
 }
 
-/// A key pair containing a public and private key.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KeyPair {
-  private_key: PrivateKey,
-  public_key: PublicKey,
-}
 
 impl KeyPair {
   /// Create a new key pair.
-  pub fn new(private_key: PrivateKey, public_key: PublicKey) -> Self {
+  pub fn new(method: EncryptionMethod, private_key: PrivateKey, public_key: PublicKey) -> Self {
     Self {
+      method,
       private_key,
       public_key,
     }
@@ -97,23 +92,12 @@ impl PublicKey {
 
 /// Generate a private and public key pair.
 pub fn generate_key_pair() -> Result<KeyPair, Crypt4GHError> {
-  // Todo, very janky, avoid writing this to a file first.
-  //let temp_dir = TempDir::new().map_err(|err| Crypt4GHError::NoTempFiles(err.to_string()))?;
-
+  let method = EncryptionMethod::X25519Chacha20Poly305();
   let private_key = PrivateKey::new();
   let public_key = PublicKey::new();
   
-  // generate_keys(
-  //   private_key.clone(),
-  //   public_key.clone(),
-  //   Ok("".to_string()),
-  //   None,
-  // );
-
-  // let private_key = get_private_key(private_key, Ok("".to_string()))?;
-  // let public_key = get_public_key(public_key)?;
-
   Ok(KeyPair::new(
+    method,
     private_key,
     public_key
   ))

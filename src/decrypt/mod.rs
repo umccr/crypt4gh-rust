@@ -9,6 +9,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
+use reader::decode::Block;
 use crate::keys::{KeyPair, KeyPairInfo};
 use futures::ready;
 use futures::Stream;
