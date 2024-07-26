@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use crate::header::{encrypt, make_packet_data_edit_list, Header};
-use crate::keys::KeyPairInfo;
+use crate::keys::KeyPair;
+use crate::header::Header;
 use crate::keys::PrivateKey;
 use tokio::io::AsyncRead;
 
@@ -49,14 +49,6 @@ impl ClampedPosition {
   pub fn end(&self) -> u64 {
     self.end
   }
-}
-
-/// Bytes representing a header packet with an edit list.
-#[derive(Debug, Clone)]
-pub struct Header {
-  header_info: Vec<u8>,
-  original_header: Vec<u8>,
-  edit_list_packet: Vec<u8>,
 }
 
 impl Header {
@@ -125,7 +117,7 @@ where
 
   /// Encrypt the edit list packet.
   pub fn encrypt_edit_list(&self, edit_list_packet: Vec<u8>) -> Result<Vec<u8>, Crypt4GHError> {
-    let keys = KeyPairInfo {
+    let keys = KeyPair{
       method: 0,
       privkey: self.private_key.clone().0,
       recipient_pubkey: self.recipient_public_key.clone().into_inner(),

@@ -110,10 +110,6 @@ struct DataEncryptionPacket {
 }
 
 
-/// FIXME: (MOVED from packets.rs) This should be probably moved to header.rs along with header as it only concerns Header ops?
-/// Since packets are not data blocks I think that for clarity it does not deserve its own file, but
-/// belongs to header.rs instead.
-
 /// A struct which will poll a decrypter stream until the session keys are found.
 /// After polling the future, the underlying decrypter stream should have processed
 /// the session keys.

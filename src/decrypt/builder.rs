@@ -1,5 +1,5 @@
 use crate::error::Crypt4GHError;
-use crate::keys::{KeyPair, KeyPairInfo};
+use crate::keys::KeyPair;
 use tokio::io::{AsyncRead, AsyncSeek};
 use tokio_util::codec::FramedRead;
 
@@ -49,7 +49,7 @@ impl Builder {
   }
 
   /// Build the decrypter.
-  pub fn build<R>(self, inner: R, keys: Vec<KeyPairInfo>) -> DecryptStream<R>
+  pub fn build<R>(self, inner: R, keys: Vec<KeyPair>) -> DecryptStream<R>
   where
     R: AsyncRead,
   {
@@ -78,17 +78,18 @@ impl Builder {
   pub async fn build_with_stream_length<R>(
     self,
     inner: R,
-    keys: Vec<KeyPairInfo>,
+    keys: Vec<KeyPair>,
   ) -> Result<DecryptStream<R>, Crypt4GHError>
   where
     R: AsyncRead + AsyncSeek + Unpin,
   {
-    let stream_length = self.stream_length;
-    let mut stream = self.build(inner, keys);
+    //let stream_length = self.stream_length;
+    let stream = self.build(inner, keys);
 
-    if stream_length.is_none() {
-      stream.recompute_stream_length().await?;
-    }
+    // FIXME: Why is calculating stream "length" necessary?
+    // if stream_length.is_none() {
+    //   stream.recompute_stream_length().await?;
+    // }
 
     Ok(stream)
   }

@@ -1,6 +1,5 @@
 pub mod builder;
 pub mod data_block;
-pub mod header;
 pub mod reader;
 
 use std::cmp::min;
@@ -9,8 +8,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use reader::decode::Block;
-use crate::keys::{KeyPair, KeyPairInfo};
+use reader::decode::{Block, DecodedBlock};
 use futures::ready;
 use futures::Stream;
 use pin_project_lite::pin_project;
@@ -18,9 +16,9 @@ use tokio::io::{AsyncRead, AsyncSeek, AsyncSeekExt};
 use tokio_util::codec::FramedRead;
 
 use crate::decrypt::data_block::DataBlockDecrypter;
-use crate::decrypt::header::packets::HeaderPacketsDecrypter;
-use crate::decrypt::header::SessionKeysFuture;
 use crate::error::Crypt4GHError;
+use crate::header::Header;
+use crate::keys::KeyPair;
 use crate::{util, keys::PublicKey};
 
 use futures::Future;
@@ -32,7 +30,7 @@ pin_project! {
         inner: FramedRead<R, Block>,
         #[pin]
         header_packet_future: Option<HeaderPacketsDecrypter>,
-        keys: Vec<KeyPairInfo>,
+        keys: Vec<KeyPair>,
         sender_pubkey: Option<PublicKey>,
         encrypted_header_packets: Option<Vec<EncryptedHeaderPacketBytes>>,
         header_info: Option<Header>,
@@ -44,7 +42,7 @@ pin_project! {
     }
 }
 
-impl<R> DecrypterStream<R>
+impl<R> DecryptStream<R>
 where
   R: AsyncRead,
 {
