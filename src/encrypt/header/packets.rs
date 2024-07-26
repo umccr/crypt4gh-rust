@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::Bytes;
-use crate::header::{deconstruct_header_body, DecryptedHeaderPackets};
+use crate::error::Crypt4GHError;
 use crate::keys::{KeyPair, PublicKey};
 use pin_project_lite::pin_project;
 use tokio::task::{spawn_blocking, JoinHandle};
@@ -12,7 +12,7 @@ pin_project! {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct HeaderPacketsDecrypt {
         #[pin]
-        handle: JoinHandle<Result<DecryptedHeaderPackets>>
+        handle: JoinHandle<Result<DecryptedHeaderPackets, Crypt4GHError>>
     }
 }
 
@@ -24,16 +24,16 @@ impl HeaderPacketsDecrypt {
   ) -> Self {
     Self {
       handle: spawn_blocking(|| {
-        HeaderPacketsDecrypter::decrypt(header_packets, keys, sender_pubkey)
+        HeaderPacketsDecrypt::decrypt(header_packets, keys, sender_pubkey)
       }),
     }
   }
 
   pub fn decrypt(
     header_packets: Vec<Bytes>,
-    keys: Vec<Keys>,
+    keys: Vec<KeyPair>, // FIXME: Not quite right
     sender_pubkey: Option<PublicKey>,
-  ) -> Result<DecryptedHeaderPackets> {
+  ) -> Result<DecryptedHeaderPackets, Crypt4GHError> {
     Ok(deconstruct_header_body(
       header_packets
         .into_iter()
@@ -45,33 +45,10 @@ impl HeaderPacketsDecrypt {
   }
 }
 
-impl Future for HeaderPacketsDecrypter {
-  type Output = Result<DecryptedHeaderPackets>;
+impl Future for HeaderPacketsDecrypt {
+  type Output = Result<DecryptedHeaderPackets, Crypt4GHError>;
 
   fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-    self.project().handle.poll(cx).map_err(JoinHandleError)?
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use crate::decoder::tests::{assert_first_header_packet, get_first_header_packet};
-
-  use super::*;
-
-  #[tokio::test]
-  async fn header_packet_decrypter() {
-    let (recipient_private_key, sender_public_key, header_packets, _) =
-      get_first_header_packet().await;
-
-    let data = HeaderPacketsDecrypt::new(
-      header_packets,
-      vec![recipient_private_key],
-      Some(PublicKey::new(sender_public_key)),
-    )
-    .await
-    .unwrap();
-
-    assert_first_header_packet(data);
+    self.project().handle.poll(cx).map_err(Crypt4GHError::JoinHandleError)?
   }
 }

@@ -44,7 +44,7 @@ use crate::error::Crypt4GHError;
 use crate::header::Header;
 
 use crate::decrypt::data_block::{ DecryptedDataBlock, DecryptedBytes };
-use keys::KeyPairInfo;
+use crate::keys::KeyPair;
 //use header::{ Header, deserialize_header_info };
 
 const CHUNK_SIZE: usize = 4096;

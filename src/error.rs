@@ -18,7 +18,7 @@ pub enum Crypt4GHError {
 	NoNonce,
 	#[error("Unable to create random salt")]
 	NoRandomSalt,
-	#[error("Unable to create session key")]
+	#[error("Unable to find or create session key")]
 	NoKey,
 	#[error("Unable to wrap key")]
 	BadKey,
@@ -32,6 +32,8 @@ pub enum Crypt4GHError {
 	InvalidPEMHeaderOrFooter,
 	#[error("Invalid SSH key format")]
 	InvalidSSHKey,
+	#[error("Invalid position: {0:?}")]
+	InvalidPosition(String),
 	#[error("Unable to wrap nonce")]
 	UnableToWrapNonce,
 	#[error("Could not decrypt block: {0:?}, {1:?}")]

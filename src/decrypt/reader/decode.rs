@@ -4,7 +4,7 @@ use bytes::{Bytes, BytesMut};
 use tokio_util::codec::Decoder;
 
 use crate::{error::Crypt4GHError::{
-  self, MaximumHeaderSize, NumericConversionError, SliceConversionError
+  self, NumericConversionError, SliceConversionError
 }, header::HeaderPacket, header::Header};
 pub const ENCRYPTED_BLOCK_SIZE: usize = 65536;
 pub const NONCE_SIZE: usize = 12; // ChaCha20 IETF Nonce size
@@ -21,7 +21,8 @@ pub const HEADER_INFO_SIZE: usize =
 
 const HEADER_PACKET_LENGTH_SIZE: usize = 4;
 
-/// Have some sort of maximum header size to prevent any overflows.
+/// Maximum header size
+/// FIXME: Does this comply with the spec?
 const MAX_HEADER_SIZE: usize = 8 * 1024 * 1024;
 
 /// The type that a block is decoded into.
@@ -115,11 +116,7 @@ impl Block {
       // We have already taken 4 bytes out of the length.
       length -= HEADER_PACKET_LENGTH_SIZE;
 
-      // Have a maximum header size to prevent any overflows.
-      if length > MAX_HEADER_SIZE {
-        return Err(MaximumHeaderSize);
-      }
-
+      // FIXME: Shouldn't those bytes be known at compile time? 
       // Get enough bytes to read the entire header packet.
       if src.len() < length {
         src.reserve(length - src.len());

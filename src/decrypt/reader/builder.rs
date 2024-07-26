@@ -1,14 +1,13 @@
 use std::thread;
 
 use crate::error::Crypt4GHError;
-use crate::keys::KeyPairInfo;
 use futures::Stream;
 use futures_util::TryStreamExt;
 use tokio::io::{AsyncRead, AsyncSeek};
 
 use crate::decrypt::builder::Builder as DecrypterBuilder;
 use crate::decrypt::DecryptStream;
-use crate::keys::PublicKey;
+use crate::keys::{KeyPair, PublicKey};
 
 use super::Reader;
 
@@ -55,7 +54,7 @@ impl Builder {
   }
 
   /// Build the Crypt4GH reader.
-  pub fn build_with_reader<R>(self, inner: R, keys: Vec<KeyPairInfo>) -> Reader<R>
+  pub fn build_with_reader<R>(self, inner: R, keys: Vec<KeyPair>) -> Reader<R>
   where
     R: AsyncRead,
   {
@@ -75,16 +74,17 @@ impl Builder {
   }
 
   /// Build the reader and compute the stream length for seek operations.
-  pub async fn build_with_stream_length<R>(self, inner: R, keys: Vec<KeyPairInfo>) -> Result<Reader<R>, Crypt4GHError>
+  pub async fn build_with_stream_length<R>(self, inner: R, keys: Vec<KeyPair>) -> Result<Reader<R>, Crypt4GHError>
   where
     R: AsyncRead + AsyncSeek + Unpin + Stream,
   {
-    let stream_length = self.stream_length;
-    let mut reader = self.build_with_reader(inner, keys);
+    //let stream_length = self.stream_length;
+    let reader = self.build_with_reader(inner, keys);
 
-    if stream_length.is_none() {
-      reader.stream.get_mut().recompute_stream_length().await?;
-    }
+    // FIXME: Why do we need to determine a stream length?
+    // if stream_length.is_none() {
+    //   reader.stream.get_mut().recompute_stream_length().await?;
+    // }
 
     Ok(reader)
   }
