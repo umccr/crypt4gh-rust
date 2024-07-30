@@ -1,6 +1,3 @@
-#![warn(missing_docs)]
-#![warn(rustdoc::missing_doc_code_examples)]
-
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
 const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
 
@@ -71,7 +68,6 @@ impl PublicKey {
   /// Generate a new sender public key.
   pub fn new() -> Self {
     unimplemented!()
-    //Self { OsRng:: }
   }  
   
   /// Create a new sender public key from bytes.
@@ -90,9 +86,31 @@ impl PublicKey {
   }
 }
 
+impl PrivateKey {
+  /// Generate a new private key.
+  pub fn new() -> Self {
+    unimplemented!()
+  }  
+  
+  /// Create a new private key from bytes.
+  pub fn new_from_bytes(bytes: Vec<u8>) -> Self {
+    Self { bytes }
+  }
+
+  /// Get the inner bytes.
+  pub fn into_inner(self) -> Vec<u8> {
+    self.bytes
+  }
+
+  /// Get the inner bytes as a reference.
+  pub fn get_ref(&self) -> &[u8] {
+    self.bytes.as_slice()
+  }
+}
+
 /// Generate a private and public key pair.
 pub fn generate_key_pair() -> Result<KeyPair, Crypt4GHError> {
-  let method = EncryptionMethod::X25519Chacha20Poly305();
+  let method = EncryptionMethod::X25519Chacha20Poly305;
   let private_key = PrivateKey::new();
   let public_key = PublicKey::new();
   

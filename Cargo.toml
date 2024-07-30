@@ -1,64 +1,10 @@
 [package]
 name = "crypt4gh"
-version = "0.4.1"
-authors = ["Roberto <roberto.ariosa@crg.eu>", "Marko Malenic <marko.malenic@umccr.org>", "Roman Valls Guimera <brainstorm@nopcode.org>"]
+version = "0.1.0"
 edition = "2021"
-license = "Apache-2.0"
-description = "Encryption and decryption implementation of the Crypt4GH encryption format."
-repository = "https://github.com/EGA-archive/crypt4gh-rust"
-documentation = "https://docs.rs/crypt4gh"
-keywords = ["crypt4gh", "genetics", "genome", "encryption", "c4gh"]
-categories = ["cryptography", "encoding"]
-readme = "README.md"
-
-[lib]
-name = "crypt4gh"
-path = "src/lib.rs"
-
-[[bin]]
-name = "crypt4gh"
-path = "src/bin.rs"
 
 [dependencies]
-clap = { version = "4", features = ["derive", "env"] }
-regex = "1.5"
-rpassword = "7"
-base64 = "0.22"
-lazy_static = "1.4"
-chacha20poly1305 = "0.10"
-crypto_kx = { version = "0.2" }
-scrypt = { version = "0.11" }
-bcrypt-pbkdf = { version = "0.10" }
-aes = { version = "0.8" }
-ctr = { version = "0.9" }
-cbc = { version = "0.1" }
-
-bincode = "1"
+noodles = { version = "0.78.0", features = ["async", "cram"] }
 serde = { version = "1", features = ["derive"] }
-log = "0.4"
-pretty_env_logger = "0.5"
-thiserror = "1"
-itertools = "0.13"
-rand = "0.8"
-rand_chacha = "0.3"
-ed25519_to_curve25519 = "0.2"
-
-curve25519-dalek = "4"
-ssh-key = { version = "0.6.4", features = ["ed25519"] }
-bytes = "1.5.0"
-rustls = "0.23"
+thiserror = { version = "1" }
 tokio = { version = "1", features = [ "io-util", "test-util", "macros", "rt-multi-thread" ] }
-futures = "0.3"
-pin-project-lite = "0.2.13"
-tokio-util = { version = "0.7", features = ["codec"] }
-futures-util = "0.3.30"
-
-[dev-dependencies]
-testresult = "0.4"
-noodles-bam = "0.65"
-noodles-sam = "0.62"
-noodles = { version = "0.78", features = [ "sam", "bam", "async" ] }
-
-[profile.release]
-lto = true
-overflow-checks = true
