@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 noodles = { version = "0.79.0", features = ["async", "cram"] }
-rand_chacha = { version = "0.3", features = [ "simd" ] }
+rand = "0.8"
+rand_chacha = { version = "0.3" } # Requires nightly, but interesting to enable in the future: features = [ "simd" ] }
 serde = { version = "1", features = ["derive"] }
 thiserror = { version = "1" }
 tokio = { version = "1", features = [ "io-util", "test-util", "macros", "rt-multi-thread" ] }

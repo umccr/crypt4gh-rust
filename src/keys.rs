@@ -17,12 +17,13 @@ pub struct KeyPair {
 	pub method: EncryptionMethod,
 	/// Secret key of the encryptor / decryptor (your key).
 	pub private_key: PrivateKey,
-	/// Public key of the recipient (the key you want to encrypt for).
-	pub public_key: PublicKey,
+	/// Public key(s) of the recipient(s)
+	pub public_key: Vec<PublicKey>,
 }
 
+#[derive(Debug)]
 pub struct SessionKeys {
-	pub inner: Vec<Vec<u8>>
+	pub inner: Option<Vec<Vec<u8>>>
 }
 
 /// Private keys are just bytes since it should support disparate formats, i.e: SSH and GA4GH
@@ -105,6 +106,30 @@ impl PrivateKey {
   /// Get the inner bytes as a reference.
   pub fn get_ref(&self) -> &[u8] {
     self.bytes.as_slice()
+  }
+}
+
+impl SessionKeys {
+  /// Create a new SessionKeys instance.
+  pub fn new(inner: Vec<Vec<u8>>) -> Self {
+    Self { inner }
+  }
+
+  /// Get the inner session keys.
+  pub fn inner(&self) -> &[Vec<u8>] {
+    &self.inner
+  }
+
+  /// Create a new SessionKeys instance from a slice of session keys.
+  pub fn from(session_keys: &[Vec<u8>]) -> Self {
+    Self {
+      inner: session_keys.to_vec(),
+    }
+  }
+
+  /// Add a session key to the inner session keys.
+  pub fn add_session_key(&mut self, session_key: Vec<u8>) {
+    self.inner.push(session_key);
   }
 }
 

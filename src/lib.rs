@@ -3,7 +3,14 @@ pub mod keys;
 pub mod error;
 pub mod encrypt;
 
-use rand_chacha::rand_core::SeedableRng;
+use std::default;
+
+use header::Header;
+use keys::SessionKeys;
+use noodles::cram::data_container::compression_header::preservation_map::tag_ids_dictionary::Key;
+use rand::Rng;
+use rand::rngs::OsRng;
+use rand_chacha::{ChaCha20Rng, rand_core::{ RngCore, SeedableRng }};
 
 use crate::{error::Crypt4GHError, keys::KeyPair};
 
@@ -25,18 +32,34 @@ impl PlainText {
         PlainText { inner: payload }
     }
 
-    pub fn encrypt(self, plaintext: PlainText, keys: KeyPair) -> CypherText {
-        let mut session_key = [0_u8; 32];
-        let mut rnd = rand_chacha::ChaCha20Rng::from_rng()?;
-        
-        // random bytes into session_key
-        rnd.try_fill_bytes(&mut session_key).map_err(|_| Crypt4GHError::NoRandomNonce)?;
-        
-        let header_bytes = header::encrypt(recipient_keys, &Some(session_key))?;
-    
-        log::debug!("header length: {}", header_bytes.len());
+    pub fn encrypt(self, plaintext: PlainText, keys: KeyPair) -> Result<CypherText, Crypt4GHError> {
+        // let recipient_keys = KeyPair::public_key(&self);
 
-        CypherText::new(payload)
+        // if recipient_keys.is_empty() {
+        //     return Err(Crypt4GHError::NoRecipients);
+	    // }
+
+        // log::info!("Encrypting the file");
+        // log::debug!("    Start Coordinate: {}", range_start);
+
+        // // Seek
+        // if range_start > 0 {
+        //     log::info!("Forwarding to position: {}", range_start);
+        // }
+
+        let seed = OsRng.gen();
+        let mut session_key = SessionKeys::from(Vec::with_capacity(32).as_ref());
+        let mut rnd = ChaCha20Rng::seed_from_u64(seed);
+        let header = Header::new();
+ 
+        // random bytes into session_key
+        // FIXME: Support multiple session keys? Refactor SessionKeys type to single session_key if not used.
+        rnd.try_fill_bytes(&mut session_key.inner.unwrap()[0]).map_err(|_| Crypt4GHError::NoRandomNonce)?;
+
+        header.encrypt(plaintext, keys, Some(session_key))
+
+        //log::debug!("header length: {}", header_bytes.len());
+
     }
 
     // // FIXME: to_recipient() as alias for this method?

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{keys::{EncryptionMethod, PrivateKey, PublicKey}, CypherText};
+use crate::{error::Crypt4GHError, keys::{EncryptionMethod, KeyPair, PrivateKey, PublicKey, SessionKeys}, CypherText, PlainText};
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -95,7 +95,7 @@ impl Header {
 	}
 
 	/// Encrypt just the header
-	pub fn encrypt(&self) -> CypherText {
+	pub fn encrypt(&self, plaintext: PlainText, keys: KeyPair, session_key: Option<SessionKeys>) -> Result<CypherText, Crypt4GHError> {
 		todo!()
 	}
 
