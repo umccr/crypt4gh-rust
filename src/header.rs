@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::keys::{EncryptionMethod, PrivateKey, PublicKey};
+use crate::{keys::{EncryptionMethod, PrivateKey, PublicKey}, CypherText};
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -93,7 +93,12 @@ impl Header {
 	pub fn new() -> Self {
 		todo!()
 	}
-	
+
+	/// Encrypt just the header
+	pub fn encrypt(&self) -> CypherText {
+		todo!()
+	}
+
 	/// Get the header packet bytes
 	pub fn packets(&self) -> &Vec<HeaderPacket> {
 		&self.packets

@@ -2,6 +2,7 @@ use std::{error::Error, path::PathBuf};
 
 use crypt4gh::error::Crypt4GHError;
 use crypt4gh::keys::{EncryptionMethod, KeyPair, PrivateKey, PublicKey};
+use crypt4gh::Crypt4Gh;
 use noodles::cram;
 use tokio::fs::File;
 
@@ -23,10 +24,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Read bytes from stdin for a CRAM
     let plain = read_cram_header(PathBuf::from("./data/cram/htsnexus_test_NA12878.cram")).await?.as_bytes().to_vec();
-
+    debug!(plain);
     // Encrypt and decrypt payload
-    let enc = c4gh.encrypt(plain)?;
-    let dec = c4gh.decrypt(enc)?;
+    let enc = &c4gh.encrypt(plain)?;
+    debug!(enc);
+    let dec = &c4gh.decrypt(enc)?;
 
     // Make sure it worked
     assert_eq!(plain, dec);
