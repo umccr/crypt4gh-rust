@@ -42,26 +42,29 @@ pub struct PublicKey {
 impl KeyPair {
   /// Create a new key pair.
   pub fn new(method: EncryptionMethod, private_key: PrivateKey, public_key: PublicKey) -> Self {
-    Self {
+    let mut pub_key = Vec::new();
+    pub_key.push(public_key);
+
+    KeyPair {
       method,
       private_key,
-      public_key,
+      public_key: pub_key,
     }
   }
 
   /// Get the inner keys.
-  pub fn into_inner(self) -> (PrivateKey, PublicKey) {
+  pub fn into_inner(self) -> (PrivateKey, Vec<PublicKey>) {
     (self.private_key, self.public_key)
   }
 
   /// Get private key.
-  pub fn private_key(&self) -> &PrivateKey {
-    &self.private_key
+  pub fn private_key(&self) -> PrivateKey {
+    self.private_key.clone()
   }
 
   /// Get private key
-  pub fn public_key(&self) -> &PublicKey {
-    &self.public_key
+  pub fn public_key(&self) -> Vec<PublicKey> {
+    self.public_key.clone()
   }
 }
 
@@ -112,24 +115,26 @@ impl PrivateKey {
 impl SessionKeys {
   /// Create a new SessionKeys instance.
   pub fn new(inner: Vec<Vec<u8>>) -> Self {
-    Self { inner }
+    Self {
+      inner: Some(inner),
+    }
   }
 
   /// Get the inner session keys.
-  pub fn inner(&self) -> &[Vec<u8>] {
-    &self.inner
+  pub fn inner(&self) -> Option<Vec<Vec<u8>>> {
+    self.inner.clone()
   }
 
   /// Create a new SessionKeys instance from a slice of session keys.
   pub fn from(session_keys: &[Vec<u8>]) -> Self {
     Self {
-      inner: session_keys.to_vec(),
+      inner: Some(session_keys.to_vec()),
     }
   }
 
   /// Add a session key to the inner session keys.
   pub fn add_session_key(&mut self, session_key: Vec<u8>) {
-    self.inner.push(session_key);
+    Some(session_key);
   }
 }
 
