@@ -58,13 +58,13 @@ impl KeyPair {
   }
 
   /// Get private key.
-  pub fn private_key(&self) -> PrivateKey {
-    self.private_key.clone()
+  pub fn private_key(&self) -> &PrivateKey {
+    &self.private_key
   }
 
   /// Get private key
-  pub fn public_key(&self) -> Vec<PublicKey> {
-    self.public_key.clone()
+  pub fn public_key(&self) -> &Vec<PublicKey> {
+    &self.public_key
   }
 }
 
@@ -121,8 +121,8 @@ impl SessionKeys {
   }
 
   /// Get the inner session keys.
-  pub fn inner(&self) -> Option<Vec<Vec<u8>>> {
-    self.inner.clone()
+  pub fn inner(&self) -> &Option<Vec<Vec<u8>>> {
+    &self.inner
   }
 
   /// Create a new SessionKeys instance from a slice of session keys.
