@@ -16,36 +16,24 @@ use rand_chacha::{ChaCha20Rng, rand_core::{ RngCore, SeedableRng }};
 
 pub struct Crypt4Gh {
     keys: KeyPair,
+    seed: u64,
 }
 
 impl Crypt4Gh {
     pub fn new(keys: KeyPair) -> Crypt4Gh {
-        Crypt4Gh { keys }
+        let seed = OsRng.gen();
+
+        Crypt4Gh { keys, seed }
     }
 
     pub fn encrypt(self, plaintext: PlainText) -> Result<CypherText, Crypt4GHError> {
-        // let recipient_keys = KeyPair::public_key(&self);
-
-        // if recipient_keys.is_empty() {
-        //     return Err(Crypt4GHError::NoRecipients);
-	    // }
-
-        // log::info!("Encrypting the file");
-        // log::debug!("    Start Coordinate: {}", range_start);
-
-        // // Seek
-        // if range_start > 0 {
-        //     log::info!("Forwarding to position: {}", range_start);
-        // }
-
-        let seed = OsRng.gen();
         let session_key = SessionKeys::from(Vec::with_capacity(32).as_ref());
-        let mut rnd = ChaCha20Rng::seed_from_u64(seed);
         let header = Header::new();
- 
+        let mut seed = ChaCha20Rng::seed_from_u64(self.seed);
+
         // random bytes into session_key
         // FIXME: Support multiple session keys? Refactor SessionKeys type to single session_key if not used.
-        rnd.try_fill_bytes(&mut session_key.inner.clone().unwrap()[0]).map_err(|_| Crypt4GHError::NoRandomNonce)?;
+        seed.try_fill_bytes(&mut session_key.inner.clone().unwrap()[0]).map_err(|_| Crypt4GHError::NoRandomNonce)?;
 
         header.encrypt(plaintext, self.keys, Some(session_key))
     }
