@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Setup PKI
     let pubkey = PublicKey::new();
     let privkey = PrivateKey::new();
-    let keys = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, privkey, pubkey);
+    let keys = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, &privkey, &pubkey);
 
     // Init the Crypt4GH client
     let c4gh = Crypt4Gh::new(&keys);

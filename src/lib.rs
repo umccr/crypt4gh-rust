@@ -16,12 +16,12 @@ use rand_chacha::{ChaCha20Rng, rand_core::{ RngCore, SeedableRng }};
 
 #[derive(Clone)]
 pub struct Crypt4Gh<'a> {
-    keys: &'a KeyPair,
+    keys: &'a KeyPair<'a>,
     seed: u64,
 }
 
 impl<'a> Crypt4Gh<'a> {
-    pub fn new(keys: &KeyPair) -> Crypt4Gh {
+    pub fn new(keys: &'a KeyPair) -> Crypt4Gh<'a> {
         let seed = OsRng.gen();
         Crypt4Gh { keys, seed }
     }
@@ -38,7 +38,8 @@ impl<'a> Crypt4Gh<'a> {
         header.encrypt(plaintext, self.keys.to_owned(), Some(session_key))
     }
     
-    pub fn decrypt(self, cyphertext: CypherText) -> Result<PlainText, Crypt4GHError> {
-        Ok(PlainText::from("payload".as_bytes().to_vec()))
+    pub fn decrypt(self, _cyphertext: CypherText) -> Result<PlainText, Crypt4GHError> {
+        todo!();
+        //Ok(PlainText::from("payload".as_bytes().to_vec()))
     }
 }

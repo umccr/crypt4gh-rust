@@ -1,24 +1,26 @@
+use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
+use rand::rngs::OsRng;
+use crypto_kx;
+
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
 const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
 
-use crate::error::Crypt4GHError;
-
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum EncryptionMethod { // TODO: Spec says u32 for this enum, how to encode?
+pub enum EncryptionMethod {
   X25519Chacha20Poly305,
   Aes256Gcm
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 /// Key information.
-pub struct KeyPair {
-	/// Method used for the key encryption.
-	/// > Only method 0 is supported.
-	pub method: EncryptionMethod,
-	/// Secret key of the encryptor / decryptor (your key).
-	pub private_key: PrivateKey,
-	/// Public key(s) of the recipient(s)
-	pub public_key: Vec<PublicKey>,
+pub struct KeyPair<'a> {
+  /// Method used for the key encryption.
+  /// > Only method 0 is supported.
+  pub method: EncryptionMethod,
+  /// Secret key of the encryptor / decryptor (your key).
+  pub private_key: &'a PrivateKey,
+  /// Public key(s) of the recipient(s)
+  pub public_keys: &'a Vec<PublicKey>,
 }
 
 #[derive(Debug)]
@@ -38,23 +40,29 @@ pub struct PublicKey {
   pub bytes: Vec<u8>,
 }
 
+impl<'a> KeyPair<'a> {
+  /// Generates a KeyPair from scratch using RustCrypto's crypto_kx
+  pub fn generate(&self) -> Self {
+    let keypair = crypto_kx::Keypair::generate(&mut OsRng);
+    let mut public_keys = vec![];
+    public_keys.push(PublicKey::from(keypair.public().as_ref().as_slice().to_vec()));
+    let private_key = PrivateKey::from(keypair.secret().to_bytes().to_vec());
 
-impl KeyPair {
-  /// Create a new key pair.
-  pub fn new(method: EncryptionMethod, private_key: PrivateKey, public_key: PublicKey) -> Self {
-    let mut pub_key = Vec::new();
-    pub_key.push(public_key);
+    KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, &private_key, &public_keys)
+  }
 
+  /// Create a new KeyPair from pre-existing public and private keys
+  pub fn new(method: EncryptionMethod, private_key: &'a PrivateKey, public_keys: &'a Vec<PublicKey>) -> Self {
     KeyPair {
       method,
       private_key,
-      public_key: pub_key,
+      public_keys,
     }
   }
 
   /// Get the inner keys.
-  pub fn into_inner(self) -> (PrivateKey, Vec<PublicKey>) {
-    (self.private_key, self.public_key)
+  pub fn into_inner(&self) -> (PrivateKey, Vec<PublicKey>) {
+    (self.private_key.clone(), self.public_keys.to_owned())
   }
 
   /// Get private key.
@@ -64,18 +72,19 @@ impl KeyPair {
 
   /// Get private key
   pub fn public_key(&self) -> &Vec<PublicKey> {
-    &self.public_key
+    &self.public_keys
   }
 }
 
 impl PublicKey {
   /// Generate a new sender public key.
   pub fn new() -> Self {
-    unimplemented!()
+    let bytes = ChaCha20Poly1305::generate_key(OsRng).to_vec();
+    PublicKey { bytes }
   }  
-  
+
   /// Create a new sender public key from bytes.
-  pub fn new_from_bytes(bytes: Vec<u8>) -> Self {
+  pub fn from(bytes: Vec<u8>) -> Self {
     Self { bytes }
   }
 
@@ -87,20 +96,31 @@ impl PublicKey {
   /// Get the inner bytes as a reference.
   pub fn get_ref(&self) -> &[u8] {
     self.bytes.as_slice()
+  }
+
+  /// Get key length
+  pub fn len(&self) -> usize {
+    self.bytes.len()
   }
 }
 
 impl PrivateKey {
   /// Generate a new private key.
   pub fn new() -> Self {
-    unimplemented!()
+    let bytes = ChaCha20Poly1305::generate_key(OsRng).to_vec();
+    PrivateKey { bytes }
   }  
   
   /// Create a new private key from bytes.
-  pub fn new_from_bytes(bytes: Vec<u8>) -> Self {
+  pub fn from(bytes: Vec<u8>) -> Self {
     Self { bytes }
   }
 
+  /// Retrieve public key from private key
+  pub fn get_public_key(self) {
+    todo!()
+  }
+  
   /// Get the inner bytes.
   pub fn into_inner(self) -> Vec<u8> {
     self.bytes
@@ -110,6 +130,11 @@ impl PrivateKey {
   pub fn get_ref(&self) -> &[u8] {
     self.bytes.as_slice()
   }
+
+  /// Get key length
+  pub fn len(&self) -> usize {
+    self.bytes.len()
+  }  
 }
 
 impl SessionKeys {
@@ -136,17 +161,4 @@ impl SessionKeys {
   pub fn add_session_key(&mut self, session_key: Vec<u8>) {
     Some(session_key);
   }
-}
-
-/// Generate a private and public key pair.
-pub fn generate_key_pair() -> Result<KeyPair, Crypt4GHError> {
-  let method = EncryptionMethod::X25519Chacha20Poly305;
-  let private_key = PrivateKey::new();
-  let public_key = PublicKey::new();
-  
-  Ok(KeyPair::new(
-    method,
-    private_key,
-    public_key
-  ))
 }
