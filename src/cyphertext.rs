@@ -6,13 +6,13 @@ pub struct CypherText {
 }
 
 impl CypherText {
-    pub fn from(cyphertext: CypherText ) -> Self {
-        CypherText { inner: cyphertext.inner }
+    pub fn from_vec(vec: Vec<u8> ) -> Self {
+        CypherText { inner: vec }
     }
 
-    pub fn decrypt(self, cyphertext: CypherText, keys: KeyPair) -> Result<PlainText, Crypt4GHError> {
-        let cg4h = Crypt4Gh::new(keys);
-        let plaintext = cg4h.decrypt(cyphertext)?;
+    pub fn decrypt(self, keys: KeyPair) -> Result<PlainText, Crypt4GHError> {
+        let cg4h = Crypt4Gh::new(&keys);
+        let plaintext = cg4h.decrypt(self)?;
         Ok(plaintext)
     }
 }

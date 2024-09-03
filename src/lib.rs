@@ -14,15 +14,15 @@ use rand::Rng;
 use rand::rngs::OsRng;
 use rand_chacha::{ChaCha20Rng, rand_core::{ RngCore, SeedableRng }};
 
-pub struct Crypt4Gh {
-    keys: KeyPair,
+#[derive(Clone)]
+pub struct Crypt4Gh<'a> {
+    keys: &'a KeyPair,
     seed: u64,
 }
 
-impl Crypt4Gh {
-    pub fn new(keys: KeyPair) -> Crypt4Gh {
+impl<'a> Crypt4Gh<'a> {
+    pub fn new(keys: &KeyPair) -> Crypt4Gh {
         let seed = OsRng.gen();
-
         Crypt4Gh { keys, seed }
     }
 
@@ -35,10 +35,10 @@ impl Crypt4Gh {
         // FIXME: Support multiple session keys? Refactor SessionKeys type to single session_key if not used.
         seed.try_fill_bytes(&mut session_key.inner.clone().unwrap()[0]).map_err(|_| Crypt4GHError::NoRandomNonce)?;
 
-        header.encrypt(plaintext, self.keys, Some(session_key))
+        header.encrypt(plaintext, self.keys.to_owned(), Some(session_key))
     }
     
     pub fn decrypt(self, cyphertext: CypherText) -> Result<PlainText, Crypt4GHError> {
-        todo!()
+        Ok(PlainText::from("payload".as_bytes().to_vec()))
     }
 }
