@@ -1,6 +1,7 @@
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
 use crypto_kx;
 use rand::rngs::OsRng;
+use std::sync::Arc;
 
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
 const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
@@ -13,14 +14,14 @@ pub enum EncryptionMethod {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 /// Key information.
-pub struct KeyPair<'a> {
+pub struct KeyPair {
 	/// Method used for the key encryption.
 	/// > Only method 0 is supported.
 	pub method: EncryptionMethod,
 	/// Secret key of the encryptor / decryptor (your key).
-	pub private_key: &'a PrivateKey,
+	pub private_key: PrivateKey,
 	/// Public key(s) of the recipient(s)
-	pub public_keys: &'a Vec<PublicKey>,
+	pub public_keys: Vec<PublicKey>,
 }
 
 #[derive(Debug)]
@@ -40,19 +41,22 @@ pub struct PublicKey {
 	pub bytes: Vec<u8>,
 }
 
-impl<'a> KeyPair<'a> {
+impl KeyPair {
 	/// Generates a KeyPair from scratch using RustCrypto's crypto_kx
-	pub fn generate(&self) -> Self {
+	pub fn generate(&mut self) -> Self {
 		let keypair = crypto_kx::Keypair::generate(&mut OsRng);
 		let mut public_keys = vec![];
 		public_keys.push(PublicKey::from(keypair.public().as_ref().as_slice().to_vec()));
 		let private_key = PrivateKey::from(keypair.secret().to_bytes().to_vec());
 
-		KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, &private_key, &public_keys)
+    self.public_keys = public_keys;
+    self.private_key = private_key;
+
+    self.to_owned()
 	}
 
 	/// Create a new KeyPair from pre-existing public and private keys
-	pub fn new(method: EncryptionMethod, private_key: &'a PrivateKey, public_keys: &'a Vec<PublicKey>) -> Self {
+	pub fn new(method: EncryptionMethod, private_key: PrivateKey, public_keys: Vec<PublicKey>) -> Self {
 		KeyPair {
 			method,
 			private_key,

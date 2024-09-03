@@ -18,13 +18,13 @@ use rand_chacha::{
 };
 
 #[derive(Clone)]
-pub struct Crypt4Gh<'a> {
-	keys: &'a KeyPair<'a>,
+pub struct Crypt4Gh {
+	keys: KeyPair,
 	seed: u64,
 }
 
-impl<'a> Crypt4Gh<'a> {
-	pub fn new(keys: &'a KeyPair) -> Crypt4Gh<'a> {
+impl<'a> Crypt4Gh {
+	pub fn new(keys: KeyPair) -> Crypt4Gh {
 		let seed = OsRng.gen();
 		Crypt4Gh { keys, seed }
 	}

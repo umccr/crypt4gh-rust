@@ -11,7 +11,7 @@ impl CypherText {
 	}
 
 	pub fn decrypt(self, keys: KeyPair) -> Result<PlainText, Crypt4GHError> {
-		let cg4h = Crypt4Gh::new(&keys);
+		let cg4h = Crypt4Gh::new(keys);
 		let plaintext = cg4h.decrypt(self)?;
 		Ok(plaintext)
 	}

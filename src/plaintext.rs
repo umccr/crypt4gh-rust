@@ -15,7 +15,7 @@ impl PlainText {
 	}
 
 	pub fn encrypt(self, plaintext: PlainText, keys: KeyPair) -> Result<CypherText, Crypt4GHError> {
-		let cg4h = Crypt4Gh::new(&keys);
+		let cg4h = Crypt4Gh::new(keys);
 		let cyphertext = cg4h.encrypt(plaintext)?;
 		Ok(cyphertext)
 	}

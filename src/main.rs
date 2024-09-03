@@ -17,12 +17,13 @@ async fn read_cram_header(src: PathBuf) -> Result<String, Crypt4GHError> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
 	// Setup PKI
-	let pubkey = PublicKey::new();
+	let mut pubkeys = vec![];
+    pubkeys.push(PublicKey::new());
 	let privkey = PrivateKey::new();
-	let keys = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, &privkey, &pubkey);
+	let keys = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, privkey, pubkeys);
 
 	// Init the Crypt4GH client
-	let c4gh = Crypt4Gh::new(&keys);
+	let c4gh = Crypt4Gh::new(keys.clone());
 
 	// Read bytes from stdin for a CRAM
 	let plain = read_cram_header(PathBuf::from("./data/cram/htsnexus_test_NA12878.cram"))
