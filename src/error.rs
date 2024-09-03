@@ -156,7 +156,7 @@ pub enum Crypt4GHError {
 	IoError(#[from] std::io::Error),
 	#[error("End of stream: {0:?}")]
 	EndOfStreamReached(String),
-	
+
 	// Conversion and decoding
 	#[error("converting slice to fixed size array")]
 	SliceConversionError,
@@ -195,4 +195,3 @@ pub enum Crypt4GHError {
 //     Self::Crypt4GHError(error.to_string())
 //   }
 //}
-
