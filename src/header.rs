@@ -1,22 +1,23 @@
+use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	error::Crypt4GHError,
-	keys::{EncryptionMethod, KeyPair, PrivateKey, PublicKey, SessionKeys},
-	CypherText, PlainText,
+	construct_encrypted_data_packet, error::Crypt4GHError, keys::{EncryptionMethod, PrivateKey, PublicKey, SessionKeys}, CypherText, Recipients, Seed
 };
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Magic([u8; 8]);
 
 /// Structs below follow crypt4gh spec §2.2
 ///
 /// Header precedes data blocks and is described in crypt4gh spec §3.2 and §2.2 for a high level graphical representation of
 /// the file structure.
-#[derive(Debug)]
+/// 
+/// TODO: Are those encrypted?
+#[derive(Debug, Serialize)]
 pub struct Header {
 	magic: Magic,
 	version: u32,
@@ -50,7 +51,7 @@ struct EditListPacket {
 }
 
 /// Data-bearing Header Packet data type as it can hold either depending on packet type
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 enum HeaderPacketDataType {
 	EditListPacket(Vec<u8>),
 	DataPacketEncrypted(Vec<u8>),
@@ -60,7 +61,7 @@ enum HeaderPacketDataType {
 ///
 /// Conditional settings for writer_public_key/nonce/mac depending on
 /// as described in the spec can be selected at runtime
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct HeaderPacket {
 	packet_length: u32,
 	encryption_method: EncryptionMethod,
@@ -94,18 +95,28 @@ struct DataEncryptionPacket {
 
 /// Implements all header-related operations described in crypt4gh spec §3.2 and onwards
 impl Header {
-	pub fn new() -> Self {
-		todo!()
-	}
-
 	/// Encrypt just the header
-	pub fn encrypt(
-		&self,
-		plaintext: PlainText,
-		keys: KeyPair,
-		session_key: Option<SessionKeys>,
+	pub(crate) fn encrypt(
+		recipients: Recipients,
+		session_keys: Option<SessionKeys>,
+		seed: Seed
 	) -> Result<CypherText, Crypt4GHError> {
-		todo!()
+		let encryption_method = 0;
+
+		let session_keys_or_new = session_keys.map_or_else(|| {
+			let mut session_key: Vec<u8> = vec![];
+			let mut rnd = rand_chacha::ChaCha20Rng::from_seed(seed.seed);
+
+			rnd.try_fill_bytes(&mut session_key).map_err(|_| Crypt4GHError::NoRandomNonce)?; // TODO: Custom error for this
+
+			Ok::<_, Crypt4GHError>(session_key)
+		}, |value| { Ok(value)} )?;
+
+		let header_content = construct_encrypted_data_packet(encryption_method, &session_keys_or_new);
+		let header_packets = encrypted_header_part(&header_content, recipient_keys)?;
+		let header_bytes = serialize_header_packets(header_packets);
+
+		Ok(CypherText::from(header_bytes))
 	}
 
 	/// Get the header packet bytes
@@ -114,7 +125,7 @@ impl Header {
 	}
 
 	/// Get the size of all the packets.
-	pub fn length(&self) -> u64 {
+	pub fn len(&self) -> u64 {
 		unimplemented!()
 	}
 
@@ -122,4 +133,22 @@ impl Header {
 	pub fn into_inner(self) -> (Vec<HeaderPacket>, u64) {
 		unimplemented!()
 	}
+}
+
+
+/// Serializes the header packets.
+///
+/// Returns [ Magic "crypt4gh" + version + packet count + header packets... ] serialized.
+pub fn serialize_header_packets(packets: Vec<Vec<u8>>) -> Vec<u8> {
+	//log::info!("Serializing the header packets ({} packets)", packets.len());
+	vec![
+		MAGIC_NUMBER.to_vec(),
+		(VERSION as u32).to_le_bytes().to_vec(),
+		(packets.len() as u32).to_le_bytes().to_vec(),
+		packets
+			.into_iter()
+			.flat_map(|packet| vec![((packet.len() + 4) as u32).to_le_bytes().to_vec(), packet].concat())
+			.collect::<Vec<u8>>(),
+	]
+	.concat()
 }

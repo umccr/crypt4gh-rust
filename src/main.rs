@@ -10,8 +10,7 @@ use tokio::fs::File;
 
 async fn read_cram_header(src: PathBuf) -> Result<String, Crypt4GHError> {
 	let mut reader = File::open(src).await.map(cram::AsyncReader::new)?;
-    reader.read_file_definition().await?;
-	let header = reader.read_file_header().await?;
+	let header = reader.read_header().await?;
 	Ok(header)
 }
 
@@ -19,7 +18,8 @@ async fn read_cram_header(src: PathBuf) -> Result<String, Crypt4GHError> {
 async fn main() -> Result<(), Box<dyn Error>> {
 	// Setup PKI
 	let mut pubkeys = vec![];
-    pubkeys.push(PublicKey::new());
+    pubkeys.push(PublicKey::new()); // TODO: Multiple recipients, revisit this from pub api perspective
+
 	let privkey = PrivateKey::new();
 	let keys = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, privkey, pubkeys);
 
@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 	let c4gh = Crypt4Gh::new(keys.clone());
 
 	// Read bytes from stdin for a CRAM
-	let plain = read_cram_header(PathBuf::from("./data/cram/range.cram"))
+	let plain = read_cram_header(PathBuf::from("./data/cram/htsnexus_test_NA12878.cram"))
 		.await?
 		.as_bytes()
 		.to_vec();

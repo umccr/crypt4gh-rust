@@ -1,7 +1,6 @@
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
 use crypto_kx;
 use rand::rngs::OsRng;
-use std::sync::Arc;
 
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
 const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
@@ -45,14 +44,16 @@ impl KeyPair {
 	/// Generates a KeyPair from scratch using RustCrypto's crypto_kx
 	pub fn generate(&mut self) -> Self {
 		let keypair = crypto_kx::Keypair::generate(&mut OsRng);
+
 		let mut public_keys = vec![];
 		public_keys.push(PublicKey::from(keypair.public().as_ref().as_slice().to_vec()));
+
 		let private_key = PrivateKey::from(keypair.secret().to_bytes().to_vec());
 
-    self.public_keys = public_keys;
-    self.private_key = private_key;
+    	self.public_keys = public_keys;
+    	self.private_key = private_key;
 
-    self.to_owned()
+	    self.to_owned()
 	}
 
 	/// Create a new KeyPair from pre-existing public and private keys

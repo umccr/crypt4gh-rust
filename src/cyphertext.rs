@@ -6,7 +6,7 @@ pub struct CypherText {
 }
 
 impl CypherText {
-	pub fn from_vec(vec: Vec<u8>) -> Self {
+	pub fn from(vec: Vec<u8>) -> Self {
 		CypherText { inner: vec }
 	}
 
