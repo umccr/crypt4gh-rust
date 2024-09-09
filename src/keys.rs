@@ -1,18 +1,21 @@
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
 use crypto_kx;
 use rand::rngs::OsRng;
+use serde::Serialize;
+
+use crate::Recipients;
 
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
 const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
 
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize)]
 pub enum EncryptionMethod {
 	X25519Chacha20Poly305,
 	Aes256Gcm,
 }
 
+/// Public/Private KeyPair information.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-/// Key information.
 pub struct KeyPair {
 	/// Method used for the key encryption.
 	/// > Only method 0 is supported.
@@ -20,12 +23,58 @@ pub struct KeyPair {
 	/// Secret key of the encryptor / decryptor (your key).
 	pub private_key: PrivateKey,
 	/// Public key(s) of the recipient(s)
-	pub public_keys: Vec<PublicKey>,
+	pub public_keys: Recipients,
 }
 
+
+/// Represents a collection of session keys.
+/// 
+/// The `SessionKeys` struct contains an optional vector of vectors of bytes,
+/// which can be used to store multiple session keys.
+/// 
+/// # Fields
+/// 
+/// * `inner` - An optional vector of vectors of bytes representing the session keys.
 #[derive(Debug)]
 pub struct SessionKeys {
 	pub inner: Option<Vec<Vec<u8>>>,
+}
+
+impl SessionKeys {
+	/// Create a new SessionKeys instance.
+	pub fn new(inner: Vec<Vec<u8>>) -> Self {
+		Self { inner: Some(inner) }
+	}
+
+	/// Get the inner session keys.
+	pub fn inner(&self) -> &Option<Vec<Vec<u8>>> {
+		&self.inner
+	}
+
+	/// Create a new SessionKeys instance from a slice of session keys.
+	pub fn from(session_keys: Vec<u8>) -> Self {
+		Self {
+			inner: Some(session_keys.to_vec()),
+		}
+	}
+	
+	/// Convert the session keys to bytes.
+	pub fn to_bytes(&self) -> Vec<u8> {
+		match &self.inner {
+			Some(keys) => keys.iter().flat_map(|key| key.clone()).collect(),
+			None => vec![],
+		}
+	}
+
+	/// Convert the session keys to a single vector of bytes.
+	pub fn to_vec(&self) -> Vec<u8> {
+		self.to_bytes()
+	}
+
+	/// Add a session key to the inner session keys.
+	pub fn add_session_key(&mut self, session_key: Vec<u8>) {
+		Some(session_key);
+	}
 }
 
 /// Private keys are just bytes since it should support disparate formats, i.e: SSH and GA4GH
@@ -35,7 +84,7 @@ pub struct PrivateKey {
 }
 
 /// A wrapper around a vec of bytes that represent a public key.
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq, Serialize)]
 pub struct PublicKey {
 	pub bytes: Vec<u8>,
 }
@@ -57,7 +106,7 @@ impl KeyPair {
 	}
 
 	/// Create a new KeyPair from pre-existing public and private keys
-	pub fn new(method: EncryptionMethod, private_key: PrivateKey, public_keys: Vec<PublicKey>) -> Self {
+	pub fn new(method: EncryptionMethod, private_key: PrivateKey, public_keys: Recipients) -> Self {
 		KeyPair {
 			method,
 			private_key,
@@ -139,29 +188,5 @@ impl PrivateKey {
 	/// Get key length
 	pub fn len(&self) -> usize {
 		self.bytes.len()
-	}
-}
-
-impl SessionKeys {
-	/// Create a new SessionKeys instance.
-	pub fn new(inner: Vec<Vec<u8>>) -> Self {
-		Self { inner: Some(inner) }
-	}
-
-	/// Get the inner session keys.
-	pub fn inner(&self) -> &Option<Vec<Vec<u8>>> {
-		&self.inner
-	}
-
-	/// Create a new SessionKeys instance from a slice of session keys.
-	pub fn from(session_keys: &[Vec<u8>]) -> Self {
-		Self {
-			inner: Some(session_keys.to_vec()),
-		}
-	}
-
-	/// Add a session key to the inner session keys.
-	pub fn add_session_key(&mut self, session_key: Vec<u8>) {
-		Some(session_key);
 	}
 }

@@ -11,7 +11,8 @@ use chacha20poly1305::consts::U32;
 use chacha20poly1305::{aead::generic_array::GenericArray, AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair, PublicKey, SecretKey};
 use cyphertext::CypherText;
-use keys::{EncryptionMethod, SessionKeys};
+use header::HeaderPacketType;
+use keys::{EncryptionMethod, PrivateKey, SessionKeys};
 use plaintext::PlainText;
 
 use rand::rngs::OsRng;
@@ -59,12 +60,12 @@ impl<'a> Crypt4Gh {
 /// It returns a vector of encrypted segments, where each segment represents the encrypted packet for a specific key.
 ///
 /// * `packet` - A vector of bytes representing the packet to be encrypted
-/// * `keys` - A collection of keys with `key.method` equal to 0
-pub fn compute_encrypted_header(packet: &[u8], keys: &HashSet<Keys>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
+/// * `keys` - A collection of keypairs with `key.method` equal to 0
+pub fn compute_encrypted_header(packet: &[u8], keys: &HashSet<KeyPair>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
 	keys.iter()
-		.filter(|key| key.method == 0)
+		.filter(|key| key.method == EncryptionMethod::X25519Chacha20Poly305)
 		.map(|key| {
-			match encrypt_x25519_chacha20_poly1305(packet, &key.privkey, &key.recipient_pubkey) {
+			match encrypt_x25519_chacha20_poly1305(packet, key.private_key, &key.public_keys) {
 				Ok(session_key) => Ok(vec![u32::from(key.method).to_le_bytes().to_vec(), session_key].concat()),
 				Err(e) => Err(e),
 			}
@@ -77,7 +78,7 @@ fn construct_encrypted_data_packet(encryption_method: EncryptionMethod, session_
 	vec![
 		bincode::serialize(&HeaderPacketType::DataEnc).expect("Unable to serialize packet type"),
 		(encryption_method as u32).to_le_bytes().to_vec(),
-		session_keys,
+		session_keys.to_bytes(),
 	]
 	.concat()
 }
@@ -127,11 +128,12 @@ fn encrypt_x25519_chacha20_poly1305(
     ].concat())
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Recipients {
-	pub recipients: Vec<HashSet<KeyPair>>
+	pub recipients: Vec<KeyPair>
 }
 
 #[derive(Clone)]
 pub struct Seed {
-	pub seed: u64
+	pub seed: [u8; 32]
 }

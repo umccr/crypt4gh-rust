@@ -27,7 +27,7 @@ pub struct Header {
 
 /// Encodes actual encrypted data from a header packet or an edit list.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-enum HeaderPacketType {
+pub enum HeaderPacketType {
 	DataEnc,
 	EditList,
 }
@@ -103,6 +103,7 @@ impl Header {
 	) -> Result<CypherText, Crypt4GHError> {
 		let encryption_method = 0;
 
+		// FIXME: Determine if multiple session keys are really needed
 		let session_keys_or_new = session_keys.map_or_else(|| {
 			let mut session_key: Vec<u8> = vec![];
 			let mut rnd = rand_chacha::ChaCha20Rng::from_seed(seed.seed);
@@ -110,9 +111,9 @@ impl Header {
 			rnd.try_fill_bytes(&mut session_key).map_err(|_| Crypt4GHError::NoRandomNonce)?; // TODO: Custom error for this
 
 			Ok::<_, Crypt4GHError>(session_key)
-		}, |value| { Ok(value)} )?;
+		}, |value| { Ok(value.to_vec())} )?;
 
-		let header_content = construct_encrypted_data_packet(encryption_method, &session_keys_or_new);
+		let header_content = construct_encrypted_data_packet(encryption_method, session_keys_or_new);
 		let header_packets = encrypted_header_part(&header_content, recipient_keys)?;
 		let header_bytes = serialize_header_packets(header_packets);
 
