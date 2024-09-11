@@ -68,6 +68,8 @@ pub enum Crypt4GHError {
 	BadClientPrivateKey,
 	#[error("Unable to create shared key")]
 	BadSharedKey,
+	#[error("Invalid Public Key")]
+	InvalidPublicKey,
 	#[error("Invalid Peer's Public Key")]
 	InvalidPeerPubPkey,
 	#[error("Invalid paramenters passed to Scrypt")]

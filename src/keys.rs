@@ -52,9 +52,9 @@ impl SessionKeys {
 	}
 
 	/// Create a new SessionKeys instance from a slice of session keys.
-	pub fn from(session_keys: Vec<u8>) -> Self {
+	pub fn from(session_keys: Vec<Vec<u8>>) -> Self {
 		Self {
-			inner: Some(session_keys.to_vec()),
+			inner: Some(session_keys),
 		}
 	}
 	
@@ -96,10 +96,11 @@ impl KeyPair {
 
 		let mut public_keys = vec![];
 		public_keys.push(PublicKey::from(keypair.public().as_ref().as_slice().to_vec()));
+		let recipients = Recipients::from(public_keys);
 
 		let private_key = PrivateKey::from(keypair.secret().to_bytes().to_vec());
 
-    	self.public_keys = public_keys;
+    	self.public_keys = recipients;
     	self.private_key = private_key;
 
 	    self.to_owned()
@@ -115,7 +116,7 @@ impl KeyPair {
 	}
 
 	/// Get the inner keys.
-	pub fn into_inner(&self) -> (PrivateKey, Vec<PublicKey>) {
+	pub fn into_inner(&self) -> (PrivateKey, Recipients) {
 		(self.private_key.clone(), self.public_keys.to_owned())
 	}
 
@@ -125,7 +126,7 @@ impl KeyPair {
 	}
 
 	/// Get private key
-	pub fn public_key(&self) -> &Vec<PublicKey> {
+	pub fn public_key(&self) -> &Recipients {
 		&self.public_keys
 	}
 }
@@ -155,6 +156,18 @@ impl PublicKey {
 	/// Get key length
 	pub fn len(&self) -> usize {
 		self.bytes.len()
+	}
+}
+
+impl TryFrom<&[u8]> for PublicKey {
+	type Error = crate::error::Crypt4GHError;
+
+	fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+		if bytes.is_empty() {
+			Err(crate::error::Crypt4GHError::InvalidPublicKey)
+		} else {
+			Ok(PublicKey { bytes: bytes.to_vec() })
+		}
 	}
 }
 

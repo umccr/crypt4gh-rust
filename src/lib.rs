@@ -6,10 +6,11 @@ pub mod plaintext;
 
 use std::collections::HashSet;
 
-use crate::{error::Crypt4GHError, keys::KeyPair};
+use crate::{error::Crypt4GHError, keys::KeyPair, keys::PublicKey};
+use chacha20poly1305::aead::Aead;
 use chacha20poly1305::consts::U32;
 use chacha20poly1305::{aead::generic_array::GenericArray, AeadCore, ChaCha20Poly1305, KeyInit};
-use crypto_kx::{Keypair, PublicKey, SecretKey};
+use crypto_kx::{Keypair as CryptoKeyPair, PublicKey as CryptoPubKey, SecretKey as CryptoSecretKey};
 use cyphertext::CypherText;
 use header::HeaderPacketType;
 use keys::{EncryptionMethod, PrivateKey, SessionKeys};
@@ -30,22 +31,24 @@ pub struct Crypt4Gh {
 
 impl<'a> Crypt4Gh {
 	pub fn new(keys: KeyPair) -> Crypt4Gh {
-		let seed = Seed { seed: OsRng.gen() };
+		let seed = Seed { inner: OsRng.gen() };
 		Crypt4Gh { keys, seed }
 	}
 
 	pub fn encrypt(self, plaintext: PlainText) -> Result<CypherText, Crypt4GHError> {
-		let session_key = SessionKeys::from(Vec::with_capacity(32).as_ref());
-		let mut seed = ChaCha20Rng::seed_from_u64(self.seed.seed);
-		let rnd = ChaCha20Rng::from_seed(seed.get_seed());
+		let session_key = SessionKeys::from(Vec::with_capacity(32));
+		// FIXME: Unsure if this is correct, revisit
+		let mut seed = ChaCha20Rng::seed_from_u64(u64::from_be_bytes(self.seed.inner[0..8].try_into().unwrap()));
+		let mut rnd = ChaCha20Rng::from_seed(seed.get_seed());
 
 		// random bytes into session_key
 		// FIXME: Support multiple session keys? Refactor SessionKeys type to single session_key if not used.
 		rnd.try_fill_bytes(&mut session_key.inner.clone().unwrap()[0])
 			.map_err(|_| Crypt4GHError::NoRandomNonce)?;
 
-		let header = Header::encrypt(, Some(session_key), self.seed)?;
-		Ok(())
+		todo!();
+		//let header = Header::encrypt(, Some(session_key), self.seed)?;
+		//Ok(())
 	}
 
 	pub fn decrypt(self, _cyphertext: CypherText) -> Result<PlainText, Crypt4GHError> {
@@ -65,8 +68,8 @@ pub fn compute_encrypted_header(packet: &[u8], keys: &HashSet<KeyPair>) -> Resul
 	keys.iter()
 		.filter(|key| key.method == EncryptionMethod::X25519Chacha20Poly305)
 		.map(|key| {
-			match encrypt_x25519_chacha20_poly1305(packet, key.private_key, &key.public_keys) {
-				Ok(session_key) => Ok(vec![u32::from(key.method).to_le_bytes().to_vec(), session_key].concat()),
+			match encrypt_x25519_chacha20_poly1305(packet, key.private_key.clone(), key.public_keys.clone()) {
+				Ok(session_key) => Ok(vec![u32::from(key.method as u32).to_le_bytes().to_vec(), session_key].concat()),
 				Err(e) => Err(e),
 			}
 		})
@@ -89,8 +92,8 @@ fn encrypt_x25519_chacha20_poly1305(
 	recipients: Recipients,
 ) -> Result<Vec<u8>, Crypt4GHError> {
 
-    let server_sk = SecretKey::try_from(&private_key[0..SecretKey::BYTES]).map_err(|_| Crypt4GHError::BadClientPrivateKey)?;
-    let client_pk = PublicKey::try_from(recipients).map_err(|_| Crypt4GHError::BadServerPublicKey)?;
+    let server_sk = CryptoSecretKey::try_from(&private_key.bytes[0..CryptoSecretKey::BYTES]).map_err(|_| Crypt4GHError::BadClientPrivateKey)?;
+	let client_pk = PublicKey::try_from(recipients.recipients[0].clone()).map_err(|_| Crypt4GHError::BadServerPublicKey)?;
 
     let pubkey = server_sk.public_key();
 
@@ -110,8 +113,9 @@ fn encrypt_x25519_chacha20_poly1305(
 	// TODO: Make sure this doesn't exceed 2^32 executions, otherwise implement a counter and/or other countermeasures against repeats
 	let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
 
-    let keypair = Keypair::from(server_sk);
-    let server_session_keys = keypair.session_keys_from(&client_pk);
+    let keypair = CryptoKeyPair::from(server_sk);
+	let client_crypto_pubkey = CryptoPubKey::from(<[u8; CryptoPubKey::BYTES]>::try_from(client_pk.bytes.as_slice()).expect("slice with incorrect length"));
+    let server_session_keys = keypair.session_keys_from(&client_crypto_pubkey);
     let shared_key = GenericArray::<u8, U32>::from_slice(&server_session_keys.rx.as_ref().as_slice());
 
     //log::debug!("   shared key: {:02x?}", shared_key.to_vec());
@@ -128,12 +132,20 @@ fn encrypt_x25519_chacha20_poly1305(
     ].concat())
 }
 
+
+/// Multiple recipients and their public keys
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Recipients {
-	pub recipients: Vec<KeyPair>
+	pub recipients: Vec<PublicKey>
+}
+
+impl Recipients {
+	pub fn from(public_keys: Vec<PublicKey>) -> Self {
+		Recipients { recipients: public_keys }
+	}
 }
 
 #[derive(Clone)]
 pub struct Seed {
-	pub seed: [u8; 32]
+	pub inner: [u8; 32]
 }

@@ -106,7 +106,7 @@ impl Header {
 		// FIXME: Determine if multiple session keys are really needed
 		let session_keys_or_new = session_keys.map_or_else(|| {
 			let mut session_key: Vec<u8> = vec![];
-			let mut rnd = rand_chacha::ChaCha20Rng::from_seed(seed.seed);
+			let mut rnd = rand_chacha::ChaCha20Rng::from_seed(seed.inner);
 
 			rnd.try_fill_bytes(&mut session_key).map_err(|_| Crypt4GHError::NoRandomNonce)?; // TODO: Custom error for this
 
