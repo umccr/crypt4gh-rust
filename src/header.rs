@@ -1,8 +1,7 @@
-use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	construct_encrypted_data_packet, error::Crypt4GHError, keys::{EncryptionMethod, PrivateKey, PublicKey, SessionKeys}, CypherText, Recipients, Seed
+	construct_encrypted_data_packet, error::Crypt4GHError, keys::{EncryptionMethod, PrivateKey, PublicKey, SessionKeys}, Crypt4Gh, CypherText, Recipients, Seed
 };
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
@@ -96,30 +95,20 @@ struct DataEncryptionPacket {
 /// Implements all header-related operations described in crypt4gh spec §3.2 and onwards
 impl Header {
 	/// Encrypt just the header
-	pub(crate) fn encrypt(
+	pub fn encrypt(
 		recipients: Recipients,
 		session_keys: Option<SessionKeys>,
-		seed: Seed
+		seed: Seed,
 	) -> Result<CypherText, Crypt4GHError> {
-		let encryption_method = 0;
+		// Invariant: Starts at position 0, so no >0 range offsets are needed for header itself and this function?
+		let header_content = construct_encrypted_data_packet(EncryptionMethod::X25519Chacha20Poly305, session_keys);
+		//let header_packets = crate::Crypt4Gh::encrypt(&header_content, recipients, None)?;
+		//let header_bytes = serialize_header_packets(header_packets);
 
-		// FIXME: Determine if multiple session keys are really needed
-		let session_keys_or_new = session_keys.map_or_else(|| {
-			let mut session_key: Vec<u8> = vec![];
-			let mut rnd = rand_chacha::ChaCha20Rng::from_seed(seed.inner);
-
-			rnd.try_fill_bytes(&mut session_key).map_err(|_| Crypt4GHError::NoRandomNonce)?; // TODO: Custom error for this
-
-			Ok::<_, Crypt4GHError>(session_key)
-		}, |value| { Ok(value.to_vec())} )?;
-
-		let header_content = construct_encrypted_data_packet(encryption_method, session_keys_or_new);
-		let header_packets = encrypted_header_part(&header_content, recipient_keys)?;
-		let header_bytes = serialize_header_packets(header_packets);
-
-		Ok(CypherText::from(header_bytes))
+		//Ok(CypherText::from(header_bytes))
+		todo!()
 	}
-
+ 
 	/// Get the header packet bytes
 	pub fn packets(&self) -> &Vec<HeaderPacket> {
 		&self.packets
@@ -153,3 +142,4 @@ pub fn serialize_header_packets(packets: Vec<Vec<u8>>) -> Vec<u8> {
 	]
 	.concat()
 }
+

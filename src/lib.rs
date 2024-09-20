@@ -26,34 +26,53 @@ use rand_chacha::{
 #[derive(Clone)]
 pub struct Crypt4Gh {
 	keys: KeyPair,
+	range: usize,
 	seed: Seed,
 }
 
 impl<'a> Crypt4Gh {
 	pub fn new(keys: KeyPair) -> Crypt4Gh {
 		let seed = Seed { inner: OsRng.gen() };
-		Crypt4Gh { keys, seed }
+		let range = 0; // Header offset by default?
+		Crypt4Gh { keys, range, seed }
 	}
 
-	pub fn encrypt(self, plaintext: PlainText) -> Result<CypherText, Crypt4GHError> {
+	pub fn encrypt(&self, plaintext: PlainText, recipients: Recipients) -> &Self {
 		let session_key = SessionKeys::from(Vec::with_capacity(32));
-		// FIXME: Unsure if this is correct, revisit
-		let mut seed = ChaCha20Rng::seed_from_u64(u64::from_be_bytes(self.seed.inner[0..8].try_into().unwrap()));
-		let mut rnd = ChaCha20Rng::from_seed(seed.get_seed());
+		let mut rnd = ChaCha20Rng::from_seed(self.seed.inner);
 
 		// random bytes into session_key
 		// FIXME: Support multiple session keys? Refactor SessionKeys type to single session_key if not used.
 		rnd.try_fill_bytes(&mut session_key.inner.clone().unwrap()[0])
-			.map_err(|_| Crypt4GHError::NoRandomNonce)?;
+			.map_err(|_| Crypt4GHError::NoRandomNonce);
 
-		todo!();
-		//let header = Header::encrypt(, Some(session_key), self.seed)?;
-		//Ok(())
+		let mut nonce_bytes = [0u8; 12];
+		rnd.fill(&mut nonce_bytes);
+
+		match range {
+			// FIXME: Should encode this range in a
+			// more fitting type than usize?
+			//
+			// Header
+			// Body => usize
+			None | Some(0) => loop {
+				todo!()
+			},
+
+			Some(mut remaining_length) => {
+				todo!()
+			}
+		}
 	}
 
-	pub fn decrypt(self, _cyphertext: CypherText) -> Result<PlainText, Crypt4GHError> {
+	pub fn decrypt(self, cyphertext: CypherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
 		todo!();
 		//Ok(PlainText::from("payload".as_bytes().to_vec()))
+	}
+
+	pub fn with_range(mut self, range: Option<usize>) -> Self {
+		self.range = range.unwrap();
+		self
 	}
 }
 
@@ -77,11 +96,11 @@ pub fn compute_encrypted_header(packet: &[u8], keys: &HashSet<KeyPair>) -> Resul
 }
 
 /// Constructs an encrypted data packet with the given encryption method and session keys
-fn construct_encrypted_data_packet(encryption_method: EncryptionMethod, session_keys: SessionKeys) -> Vec<u8> {
+fn construct_encrypted_data_packet(encryption_method: EncryptionMethod, session_keys: Option<SessionKeys>) -> Vec<u8> {
 	vec![
 		bincode::serialize(&HeaderPacketType::DataEnc).expect("Unable to serialize packet type"),
 		(encryption_method as u32).to_le_bytes().to_vec(),
-		session_keys.to_bytes(),
+		session_keys.unwrap().to_bytes(),
 	]
 	.concat()
 }
@@ -93,7 +112,7 @@ fn encrypt_x25519_chacha20_poly1305(
 ) -> Result<Vec<u8>, Crypt4GHError> {
 
     let server_sk = CryptoSecretKey::try_from(&private_key.bytes[0..CryptoSecretKey::BYTES]).map_err(|_| Crypt4GHError::BadClientPrivateKey)?;
-	let client_pk = PublicKey::try_from(recipients.recipients[0].clone()).map_err(|_| Crypt4GHError::BadServerPublicKey)?;
+	let client_pk = PublicKey::try_from(recipients.public_keys[0].clone()).map_err(|_| Crypt4GHError::BadServerPublicKey)?;
 
     let pubkey = server_sk.public_key();
 
@@ -136,12 +155,16 @@ fn encrypt_x25519_chacha20_poly1305(
 /// Multiple recipients and their public keys
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Recipients {
-	pub recipients: Vec<PublicKey>
+	pub public_keys: Vec<PublicKey>
 }
 
 impl Recipients {
 	pub fn from(public_keys: Vec<PublicKey>) -> Self {
-		Recipients { recipients: public_keys }
+		Recipients { public_keys }
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.public_keys.is_empty()
 	}
 }
 

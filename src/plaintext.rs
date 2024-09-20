@@ -1,7 +1,7 @@
 use crate::cyphertext::CypherText;
 use crate::error::Crypt4GHError;
 use crate::keys::KeyPair;
-use crate::Crypt4Gh;
+use crate::{Crypt4Gh, Recipients};
 
 /// Plaintext newtype, avoids API misuse
 #[derive(Debug)]
@@ -14,14 +14,14 @@ impl PlainText {
 		PlainText { inner: payload }
 	}
 
-	pub fn encrypt(self, plaintext: PlainText, keys: KeyPair) -> Result<CypherText, Crypt4GHError> {
+	pub fn encrypt(self, plaintext: PlainText, recipients: Recipients, keys: KeyPair) -> Result<CypherText, Crypt4GHError> {
 		let cg4h = Crypt4Gh::new(keys);
-		let cyphertext = cg4h.encrypt(plaintext)?;
+		let cyphertext = cg4h.encrypt(plaintext, recipients)
+													    .with_range(plaintext.length())?;
 		Ok(cyphertext)
 	}
 
-	// // FIXME: to_recipient() as alias for this method?
-	// pub fn with_pubkey() {
-
-	// }
+	pub fn length(&self) -> usize {
+		self.inner.len()
+	}
 }
