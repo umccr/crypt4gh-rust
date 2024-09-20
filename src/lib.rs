@@ -5,6 +5,7 @@ pub mod keys;
 pub mod plaintext;
 
 use std::collections::HashSet;
+use std::ops::{RangeBounds, RangeFull};
 
 use crate::{error::Crypt4GHError, keys::KeyPair, keys::PublicKey};
 use chacha20poly1305::aead::Aead;
@@ -26,17 +27,17 @@ use rand_chacha::{
 #[derive(Clone)]
 pub struct Crypt4Gh {
 	keys: KeyPair,
-	range: usize,
+	range: std::ops::Range<usize>,
 	seed: Seed,
 }
 
-impl<'a> Crypt4Gh {
-	pub fn new(keys: KeyPair) -> Crypt4Gh {
-		let seed = Seed { inner: OsRng.gen() };
-		let range = 0; // Header offset by default?
-		Crypt4Gh { keys, range, seed }
-	}
+pub struct Crypt4GhBuilder {
+	keys: KeyPair,
+	range: Option<std::ops::Range<usize>>,
+	seed: Option<Seed>,	
+}
 
+impl<'a> Crypt4Gh {
 	pub fn encrypt(&self, plaintext: PlainText, recipients: Recipients) -> &Self {
 		let session_key = SessionKeys::from(Vec::with_capacity(32));
 		let mut rnd = ChaCha20Rng::from_seed(self.seed.inner);
@@ -49,12 +50,9 @@ impl<'a> Crypt4Gh {
 		let mut nonce_bytes = [0u8; 12];
 		rnd.fill(&mut nonce_bytes);
 
+		// TODO: Leverage (Async)Read trait
+		// TODO: Perhaps with slices of bytes/Vecs? Bytes crate?
 		match range {
-			// FIXME: Should encode this range in a
-			// more fitting type than usize?
-			//
-			// Header
-			// Body => usize
 			None | Some(0) => loop {
 				todo!()
 			},
@@ -70,12 +68,41 @@ impl<'a> Crypt4Gh {
 		//Ok(PlainText::from("payload".as_bytes().to_vec()))
 	}
 
-	pub fn with_range(mut self, range: Option<usize>) -> Self {
-		self.range = range.unwrap();
-		self
-	}
 }
 
+impl Crypt4GhBuilder {
+	pub fn new(keys: KeyPair) -> Crypt4GhBuilder {
+		Crypt4GhBuilder {
+			keys, 
+			range: None, 
+			seed: None 
+		}
+	}
+
+	pub fn with_range<T: RangeBounds<usize>>(mut self, range: T) -> Self {
+		let start = match range.start_bound() {
+			std::ops::Bound::Included(start) => *start + 1,
+			std::ops::Bound::Excluded(start) => *start,
+			std::ops::Bound::Unbounded => 0
+		};
+		let end = match range.end_bound() {
+			std::ops::Bound::Included(end) => *end + 1,
+			std::ops::Bound::Excluded(end) => *end,
+			std::ops::Bound::Unbounded => usize::MAX
+		};
+
+		self.range = Some(start..end);
+		self
+	}
+
+	pub fn build(self) -> Crypt4Gh {
+		Crypt4Gh {
+			keys: self.keys,
+			range: self.range.unwrap_or(0..usize::MAX),
+			seed: self.seed.unwrap_or(Seed { inner: OsRng.gen() }),
+		}
+	}
+}
 /// Computes the encrypted header part for each key in the given collection
 ///
 /// Given a set of keys and a vector of bytes representing a packet, this function iterates over the keys and encrypts the packet using the x25519_chacha20_poly1305 encryption method.

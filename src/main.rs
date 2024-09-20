@@ -22,30 +22,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 	let privkey = PrivateKey::new();
 	let keypair = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, privkey, pubkeys);
+	let private_key = keypair.private_key;
 
 	// Init the Crypt4GH client
-	let c4gh = Crypt4Gh::new(keys.clone());
+	let c4gh = Crypt4GhBuilder::new(keys.clone()).build();
+								//.with_range(..);
 
 	// Read header bytes from a CRAM file
 	let cram_header = read_cram_header(PathBuf::from("./data/cram/htsnexus_test_NA12878.cram"))
 		.await?
 		.as_bytes()
 		.to_vec();
+
 	let plaintext = PlainText::from(cram_header);
 
 	// Encrypt and decrypt payload
 	let recipients = Recipients::from(pubkeys);
 
-	let enc = c4gh.encrypt(plaintext, recipients)
-				  .with_range("0-200")?; // TODO: Determine Range type:
-										 //
-										 // Range::None
-										 // Range::Header
-										 // Range::Body
-										 // Range::Full
-										 // Range::Custom(usize) ???
-
-	let dec = enc.decrypt(keypair.private_key)?;
+	let enc = c4gh.encrypt(plaintext, recipients);
+	let dec = enc.decrypt(private_key)?;
 
 	dbg!(dec);
 
