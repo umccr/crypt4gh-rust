@@ -26,14 +26,13 @@ pub struct KeyPair {
 	pub public_keys: Recipients,
 }
 
-
 /// Represents a collection of session keys.
-/// 
+///
 /// The `SessionKeys` struct contains an optional vector of vectors of bytes,
 /// which can be used to store multiple session keys.
-/// 
+///
 /// # Fields
-/// 
+///
 /// * `inner` - An optional vector of vectors of bytes representing the session keys.
 #[derive(Debug)]
 pub struct SessionKeys {
@@ -57,7 +56,7 @@ impl SessionKeys {
 			inner: Some(session_keys),
 		}
 	}
-	
+
 	/// Convert the session keys to bytes.
 	pub fn to_bytes(&self) -> Vec<u8> {
 		match &self.inner {
@@ -100,10 +99,10 @@ impl KeyPair {
 
 		let private_key = PrivateKey::from(keypair.secret().to_bytes().to_vec());
 
-    	self.public_keys = recipients;
-    	self.private_key = private_key;
+		self.public_keys = recipients;
+		self.private_key = private_key;
 
-	    self.to_owned()
+		self.to_owned()
 	}
 
 	/// Create a new KeyPair from pre-existing public and private keys
@@ -165,7 +164,8 @@ impl TryFrom<&[u8]> for PublicKey {
 	fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
 		if bytes.is_empty() {
 			Err(crate::error::Crypt4GHError::InvalidPublicKey)
-		} else {
+		}
+		else {
 			Ok(PublicKey { bytes: bytes.to_vec() })
 		}
 	}

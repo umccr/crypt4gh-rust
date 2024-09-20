@@ -14,10 +14,14 @@ impl PlainText {
 		PlainText { inner: payload }
 	}
 
-	pub fn encrypt(self, plaintext: PlainText, recipients: Recipients, keys: KeyPair) -> Result<CypherText, Crypt4GHError> {
+	pub fn encrypt(
+		self,
+		plaintext: PlainText,
+		recipients: Recipients,
+		keys: KeyPair,
+	) -> Result<CypherText, Crypt4GHError> {
 		let cg4h = Crypt4Gh::new(keys);
-		let cyphertext = cg4h.encrypt(plaintext, recipients)
-													    .with_range(plaintext.length())?;
+		let cyphertext = cg4h.encrypt(plaintext, recipients).with_range(plaintext.length())?;
 		Ok(cyphertext)
 	}
 

@@ -1,10 +1,10 @@
-use std::{error::Error, path::PathBuf};
+use std::error::Error;
+use std::path::PathBuf;
 
 use crypt4gh::error::Crypt4GHError;
 use crypt4gh::keys::{EncryptionMethod, KeyPair, PrivateKey, PublicKey};
 use crypt4gh::plaintext::PlainText;
 use crypt4gh::{Crypt4Gh, Recipients};
-
 use noodles::cram;
 use tokio::fs::File;
 
@@ -18,7 +18,7 @@ async fn read_cram_header(src: PathBuf) -> Result<String, Crypt4GHError> {
 async fn main() -> Result<(), Box<dyn Error>> {
 	// Setup PKI
 	let mut pubkeys = vec![];
-    pubkeys.push(PublicKey::new());
+	pubkeys.push(PublicKey::new());
 
 	let privkey = PrivateKey::new();
 	let keypair = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, privkey, pubkeys);
@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 	// Init the Crypt4GH client
 	let c4gh = Crypt4GhBuilder::new(keys.clone()).build();
-								//.with_range(..);
+	//.with_range(..);
 
 	// Read header bytes from a CRAM file
 	let cram_header = read_cram_header(PathBuf::from("./data/cram/htsnexus_test_NA12878.cram"))

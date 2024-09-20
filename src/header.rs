@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-	construct_encrypted_data_packet, error::Crypt4GHError, keys::{EncryptionMethod, PrivateKey, PublicKey, SessionKeys}, Crypt4Gh, CypherText, Recipients, Seed
-};
+use crate::error::Crypt4GHError;
+use crate::keys::{EncryptionMethod, PrivateKey, PublicKey, SessionKeys};
+use crate::{construct_encrypted_data_packet, Crypt4Gh, CypherText, Recipients, Seed};
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -14,7 +14,7 @@ pub struct Magic([u8; 8]);
 ///
 /// Header precedes data blocks and is described in crypt4gh spec §3.2 and §2.2 for a high level graphical representation of
 /// the file structure.
-/// 
+///
 /// TODO: Are those encrypted?
 #[derive(Debug, Serialize)]
 pub struct Header {
@@ -67,8 +67,8 @@ pub struct HeaderPacket {
 	writer_public_key: PublicKey,
 	nonce: Vec<u8>,
 	encrypted_payload: Vec<u8>,
-	mac: Vec<u8>, //dalek::Mac type might be more fitting
-	              // TODO: MAC[16] for chacha20_ietf_poly1305
+	mac: Vec<u8>, /* dalek::Mac type might be more fitting
+	               * TODO: MAC[16] for chacha20_ietf_poly1305 */
 }
 
 /// Crypt4gh spec §3.2.2
@@ -102,13 +102,13 @@ impl Header {
 	) -> Result<CypherText, Crypt4GHError> {
 		// Invariant: Starts at position 0, so no >0 range offsets are needed for header itself and this function?
 		let header_content = construct_encrypted_data_packet(EncryptionMethod::X25519Chacha20Poly305, session_keys);
-		//let header_packets = crate::Crypt4Gh::encrypt(&header_content, recipients, None)?;
-		//let header_bytes = serialize_header_packets(header_packets);
+		// let header_packets = crate::Crypt4Gh::encrypt(&header_content, recipients, None)?;
+		// let header_bytes = serialize_header_packets(header_packets);
 
-		//Ok(CypherText::from(header_bytes))
+		// Ok(CypherText::from(header_bytes))
 		todo!()
 	}
- 
+
 	/// Get the header packet bytes
 	pub fn packets(&self) -> &Vec<HeaderPacket> {
 		&self.packets
@@ -125,12 +125,11 @@ impl Header {
 	}
 }
 
-
 /// Serializes the header packets.
 ///
 /// Returns [ Magic "crypt4gh" + version + packet count + header packets... ] serialized.
 pub fn serialize_header_packets(packets: Vec<Vec<u8>>) -> Vec<u8> {
-	//log::info!("Serializing the header packets ({} packets)", packets.len());
+	// log::info!("Serializing the header packets ({} packets)", packets.len());
 	vec![
 		MAGIC_NUMBER.to_vec(),
 		(VERSION as u32).to_le_bytes().to_vec(),
@@ -142,4 +141,3 @@ pub fn serialize_header_packets(packets: Vec<Vec<u8>>) -> Vec<u8> {
 	]
 	.concat()
 }
-

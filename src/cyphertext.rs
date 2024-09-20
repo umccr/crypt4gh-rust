@@ -1,4 +1,7 @@
-use crate::{error::Crypt4GHError, keys::KeyPair, plaintext::PlainText, Crypt4Gh};
+use crate::error::Crypt4GHError;
+use crate::keys::KeyPair;
+use crate::plaintext::PlainText;
+use crate::Crypt4Gh;
 
 #[derive(Debug)]
 pub struct CypherText {

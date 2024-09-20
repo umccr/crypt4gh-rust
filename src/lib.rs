@@ -7,22 +7,22 @@ pub mod plaintext;
 use std::collections::HashSet;
 use std::ops::{RangeBounds, RangeFull};
 
-use crate::{error::Crypt4GHError, keys::KeyPair, keys::PublicKey};
+use chacha20poly1305::aead::generic_array::GenericArray;
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::consts::U32;
-use chacha20poly1305::{aead::generic_array::GenericArray, AeadCore, ChaCha20Poly1305, KeyInit};
+use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair as CryptoKeyPair, PublicKey as CryptoPubKey, SecretKey as CryptoSecretKey};
 use cyphertext::CypherText;
 use header::HeaderPacketType;
 use keys::{EncryptionMethod, PrivateKey, SessionKeys};
 use plaintext::PlainText;
-
 use rand::rngs::OsRng;
 use rand::{Rng, RngCore};
-use rand_chacha::{
-	rand_core::SeedableRng,
-	ChaCha20Rng,
-};
+use rand_chacha::rand_core::SeedableRng;
+use rand_chacha::ChaCha20Rng;
+
+use crate::error::Crypt4GHError;
+use crate::keys::{KeyPair, PublicKey};
 
 #[derive(Clone)]
 pub struct Crypt4Gh {
@@ -34,7 +34,7 @@ pub struct Crypt4Gh {
 pub struct Crypt4GhBuilder {
 	keys: KeyPair,
 	range: Option<std::ops::Range<usize>>,
-	seed: Option<Seed>,	
+	seed: Option<Seed>,
 }
 
 impl<'a> Crypt4Gh {
@@ -59,23 +59,22 @@ impl<'a> Crypt4Gh {
 
 			Some(mut remaining_length) => {
 				todo!()
-			}
+			},
 		}
 	}
 
 	pub fn decrypt(self, cyphertext: CypherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
 		todo!();
-		//Ok(PlainText::from("payload".as_bytes().to_vec()))
+		// Ok(PlainText::from("payload".as_bytes().to_vec()))
 	}
-
 }
 
 impl Crypt4GhBuilder {
 	pub fn new(keys: KeyPair) -> Crypt4GhBuilder {
 		Crypt4GhBuilder {
-			keys, 
-			range: None, 
-			seed: None 
+			keys,
+			range: None,
+			seed: None,
 		}
 	}
 
@@ -83,12 +82,12 @@ impl Crypt4GhBuilder {
 		let start = match range.start_bound() {
 			std::ops::Bound::Included(start) => *start + 1,
 			std::ops::Bound::Excluded(start) => *start,
-			std::ops::Bound::Unbounded => 0
+			std::ops::Bound::Unbounded => 0,
 		};
 		let end = match range.end_bound() {
 			std::ops::Bound::Included(end) => *end + 1,
 			std::ops::Bound::Excluded(end) => *end,
-			std::ops::Bound::Unbounded => usize::MAX
+			std::ops::Bound::Unbounded => usize::MAX,
 		};
 
 		self.range = Some(start..end);
@@ -113,12 +112,12 @@ impl Crypt4GhBuilder {
 pub fn compute_encrypted_header(packet: &[u8], keys: &HashSet<KeyPair>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
 	keys.iter()
 		.filter(|key| key.method == EncryptionMethod::X25519Chacha20Poly305)
-		.map(|key| {
-			match encrypt_x25519_chacha20_poly1305(packet, key.private_key.clone(), key.public_keys.clone()) {
+		.map(
+			|key| match encrypt_x25519_chacha20_poly1305(packet, key.private_key.clone(), key.public_keys.clone()) {
 				Ok(session_key) => Ok(vec![u32::from(key.method as u32).to_le_bytes().to_vec(), session_key].concat()),
 				Err(e) => Err(e),
-			}
-		})
+			},
+		)
 		.collect()
 }
 
@@ -137,11 +136,12 @@ fn encrypt_x25519_chacha20_poly1305(
 	private_key: PrivateKey,
 	recipients: Recipients,
 ) -> Result<Vec<u8>, Crypt4GHError> {
+	let server_sk = CryptoSecretKey::try_from(&private_key.bytes[0..CryptoSecretKey::BYTES])
+		.map_err(|_| Crypt4GHError::BadClientPrivateKey)?;
+	let client_pk =
+		PublicKey::try_from(recipients.public_keys[0].clone()).map_err(|_| Crypt4GHError::BadServerPublicKey)?;
 
-    let server_sk = CryptoSecretKey::try_from(&private_key.bytes[0..CryptoSecretKey::BYTES]).map_err(|_| Crypt4GHError::BadClientPrivateKey)?;
-	let client_pk = PublicKey::try_from(recipients.public_keys[0].clone()).map_err(|_| Crypt4GHError::BadServerPublicKey)?;
-
-    let pubkey = server_sk.public_key();
+	let pubkey = server_sk.public_key();
 
 	// log::debug!("   packed data({}): {:02x?}", data.len(), data);
 	// log::debug!("   public key({}): {:02x?}", pubkey.as_ref().len(), pubkey.as_ref());
@@ -159,30 +159,28 @@ fn encrypt_x25519_chacha20_poly1305(
 	// TODO: Make sure this doesn't exceed 2^32 executions, otherwise implement a counter and/or other countermeasures against repeats
 	let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
 
-    let keypair = CryptoKeyPair::from(server_sk);
-	let client_crypto_pubkey = CryptoPubKey::from(<[u8; CryptoPubKey::BYTES]>::try_from(client_pk.bytes.as_slice()).expect("slice with incorrect length"));
-    let server_session_keys = keypair.session_keys_from(&client_crypto_pubkey);
-    let shared_key = GenericArray::<u8, U32>::from_slice(&server_session_keys.rx.as_ref().as_slice());
+	let keypair = CryptoKeyPair::from(server_sk);
+	let client_crypto_pubkey = CryptoPubKey::from(
+		<[u8; CryptoPubKey::BYTES]>::try_from(client_pk.bytes.as_slice()).expect("slice with incorrect length"),
+	);
+	let server_session_keys = keypair.session_keys_from(&client_crypto_pubkey);
+	let shared_key = GenericArray::<u8, U32>::from_slice(&server_session_keys.rx.as_ref().as_slice());
 
-    //log::debug!("   shared key: {:02x?}", shared_key.to_vec());
+	// log::debug!("   shared key: {:02x?}", shared_key.to_vec());
 
-    let cipher = ChaCha20Poly1305::new(shared_key);
+	let cipher = ChaCha20Poly1305::new(shared_key);
 
-    let ciphertext = cipher.encrypt(&nonce, data)
-        .map_err(|err| Crypt4GHError::UnableToEncryptPacket(err.to_string()))?;
+	let ciphertext = cipher
+		.encrypt(&nonce, data)
+		.map_err(|err| Crypt4GHError::UnableToEncryptPacket(err.to_string()))?;
 
-    Ok(vec![
-        pubkey.as_ref(),
-        nonce.as_slice(),
-        ciphertext.as_slice()
-    ].concat())
+	Ok(vec![pubkey.as_ref(), nonce.as_slice(), ciphertext.as_slice()].concat())
 }
-
 
 /// Multiple recipients and their public keys
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Recipients {
-	pub public_keys: Vec<PublicKey>
+	pub public_keys: Vec<PublicKey>,
 }
 
 impl Recipients {
@@ -197,5 +195,5 @@ impl Recipients {
 
 #[derive(Clone)]
 pub struct Seed {
-	pub inner: [u8; 32]
+	pub inner: [u8; 32],
 }
