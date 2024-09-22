@@ -89,16 +89,12 @@ Use the exposed functions:
 ```rust
 pub fn encrypt<R: Read, W: Write>(
     recipient_keys: &HashSet<Keys>,
-    read_buffer: &mut R,
-    write_buffer: &mut W,
     range_start: usize,
     range_span: Option<usize>
 ) -> Result<()>
 
 pub fn decrypt<R: Read, W: Write>(
     keys: Vec<Keys>,
-    read_buffer: &mut R,
-    write_buffer: &mut W,
     range_start: usize,
     range_span: Option<usize>,
     sender_pubkey: Option<Vec<u8>>,
@@ -107,15 +103,11 @@ pub fn decrypt<R: Read, W: Write>(
 pub fn reencrypt<R: Read, W: Write>(
     keys: Vec<Keys>,
     recipient_keys: HashSet<Keys>,
-    read_buffer: &mut R,
-    write_buffer: &mut W,
     trim: bool,
 ) -> Result<()>
 
 pub fn rearrange<R: Read, W: Write>(
     keys: Vec<Keys>,
-    read_buffer: &mut R,
-    write_buffer: &mut W,
     range_start: usize,
     range_span: Option<usize>,
 ) -> Result<()>

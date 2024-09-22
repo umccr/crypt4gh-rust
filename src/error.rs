@@ -1,9 +1,9 @@
 use std::error::Error;
-use std::path::PathBuf;
 
-use thiserror::Error;
+use thiserror::Error as ThisError;
+use tokio::task;
 
-#[derive(Debug, Error)]
+#[derive(Debug, ThisError)]
 pub enum Crypt4GHError {
 	// User errors
 	#[error("No Recipients' Public Key found")]
@@ -12,14 +12,13 @@ pub enum Crypt4GHError {
 	InvalidRangeSpan(Option<usize>),
 	#[error("The edit list is empty")]
 	EmptyEditList,
-	// Sodiumoxide errors
 	#[error("Unable to create random nonce")]
 	NoRandomNonce,
 	#[error("Unable to extract nonce")]
 	NoNonce,
 	#[error("Unable to create random salt")]
 	NoRandomSalt,
-	#[error("Unable to create session key")]
+	#[error("Unable to find or create session key")]
 	NoKey,
 	#[error("Unable to wrap key")]
 	BadKey,
@@ -27,12 +26,14 @@ pub enum Crypt4GHError {
 	// DecryptKeyError(SymmetricCipherError),
 	#[error("Invalid key format")]
 	InvalidKeyFormat,
-	#[error("Invalid PEM file length. The file ({0:?}) is not 3 lines long")]
-	InvalidPEMFormatLength(PathBuf),
+	#[error("Invalid PEM file length.")]
+	InvalidPEMFormatLength,
 	#[error("Invalid PEM file header or footer: -----BEGIN or -----END")]
 	InvalidPEMHeaderOrFooter,
 	#[error("Invalid SSH key format")]
 	InvalidSSHKey,
+	#[error("Invalid position: {0:?}")]
+	InvalidPosition(String),
 	#[error("Unable to wrap nonce")]
 	UnableToWrapNonce,
 	#[error("Could not decrypt block: {0:?}, {1:?}")]
@@ -56,7 +57,7 @@ pub enum Crypt4GHError {
 	#[error("Decryption failed -> Invalid data: {0}")]
 	InvalidData(String),
 
-	// Keys errors
+	// Key errors
 	#[error("Unable to extract public server key")]
 	BadServerPublicKey,
 	#[error("Unable to extract private server key")]
@@ -91,8 +92,6 @@ pub enum Crypt4GHError {
 	ReadBlockError(Box<dyn Error + Send + Sync>),
 	#[error("Error reading the remainder of the file (ERROR = {0:?})")]
 	ReadRemainderError(Box<dyn Error + Send + Sync>),
-	#[error("Unable to read lines from {0:?} (ERROR = {1:?})")]
-	ReadLinesError(PathBuf, Box<dyn Error + Send + Sync>),
 	#[error("Unable to deserialize rounds from private key")]
 	ReadRoundsError,
 	#[error("Unable to extract public key")]
@@ -109,10 +108,8 @@ pub enum Crypt4GHError {
 	MagicStringError,
 	#[error("Unsupported CRYPT4GH version (version = {0:?})")]
 	InvalidCrypt4GHVersion(u32),
-	#[error("Empty public key at {0:?}")]
-	EmptyPublicKey(PathBuf),
-	#[error("Secret key not found: {0}")]
-	ReadSecretKeyFileError(PathBuf),
+	#[error("Empty public key")]
+	EmptyPublicKey,
 
 	// Packets
 	#[error("Unable to read packet encryption method")]
@@ -154,53 +151,48 @@ pub enum Crypt4GHError {
 	#[error("Unable to parse the start of the range")]
 	ParseRangeError,
 
-	// // Config errors
-	// #[error("Unable to get environment variable '{0}' (ERROR = {1}) ")]
-	// NoEnvVar(&'static str, String),
-	// #[error("Wrong Port")]
-	// WrongPort,
-	// #[error("Bad config (ERROR = {0})")]
-	// BadConfig(String),
-
-	// // Binding errors
-	// #[error("Unable to bind to the address (ERROR = {0})")]
-	// BindingError(String),
-	// #[error("Unable to parse address: {0} (ERROR = {1})")]
-	// WrongAddress(String, String),
-
-	// // Runtime errors
-	// #[error("Internal Server Failed (ERROR = {0})")]
-	// InternalServerError(String),
-	// #[error("Page not found (ERROR = {0})")]
-	// NotFound(String),
-	// #[error("Database Failed (ERROR = {0})")]
-	// DbError(String),
-	// #[error("Cache Failed (ERROR = {0})")]
-	// CacheError(String),
-	// #[error("Invalid Headers")]
-	// InvalidHeaders,
-
-	// // Passport errors
-	// #[error("Unable to construct passport (ERROR = {0})")]
-	// BadPassport(String),
-
-	// // Authentication errors
-	// #[error("Unauthorized")]
-	// Unauthorized,
-	// #[error("Forbidden")]
-	// Forbidden,
-
-	// // AMQP
-	// #[error("Connection url bad format")]
-	// BadConfigConnectionUrl,
-	// #[error("AMQP TlsConnector builder failed")]
-	// TlsConnectorError,
-	// #[error("AMQP Connection failed")]
-	// ConnectionError(Option<amiquip::Error>),
-	// #[error("AMQP Error")]
-	// AMQPError(#[from] amiquip::Error),
-
 	// IO
 	#[error("IO failed")]
 	IoError(#[from] std::io::Error),
+	#[error("End of stream: {0:?}")]
+	EndOfStreamReached(String),
+	
+	// Conversion and decoding
+	#[error("converting slice to fixed size array")]
+	SliceConversionError,
+	#[error("converting between numeric types")]
+	NumericConversionError,
+	#[error("Decoding header info error")]
+	DecodingHeader,
+	#[error("Decoding header packet error")]
+	DecodingHeaderPacket,
+	#[error("join handle error: `{0}`")]
+	JoinHandleError(task::JoinError),
+	#[error("maximum header size exceeded")]
+	MaximumHeaderSize,
+	#[error("crypt4gh error: `{0}`")]
+	Crypt4GHError(String),
 }
+
+// impl From<io::Error> for Crypt4GHError {
+//   fn from(error: io::Error) -> Self {
+//     Self::IOError(error)
+//   }
+// }
+
+// impl From<dyn Error> for Crypt4GHError {
+//   fn from(error: dyn std::error::Error) -> Self {
+//     if let std::error::Error::IOError(error) = error {
+//       error
+//     } else {
+//       Self::new(io::ErrorKind::Other, error)
+//     }
+//   }
+// }
+
+// impl From<dyn Error> for Crypt4GHError {
+//   fn from(error: Crypt4GHError) -> Self {
+//     Self::Crypt4GHError(error.to_string())
+//   }
+//}
+
