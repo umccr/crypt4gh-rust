@@ -5,7 +5,8 @@ pub mod keys;
 pub mod plaintext;
 
 use std::collections::HashSet;
-use std::ops::{RangeBounds, RangeFull};
+use std::ops::RangeBounds;
+use std::os::unix::process;
 
 use chacha20poly1305::aead::generic_array::GenericArray;
 use chacha20poly1305::aead::Aead;
@@ -15,14 +16,24 @@ use crypto_kx::{Keypair as CryptoKeyPair, PublicKey as CryptoPubKey, SecretKey a
 use cyphertext::CypherText;
 use header::HeaderPacketType;
 use keys::{EncryptionMethod, PrivateKey, SessionKeys};
+use noodles::cram::r#async::io::reader;
 use plaintext::PlainText;
 use rand::rngs::OsRng;
 use rand::{Rng, RngCore};
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
+use serde::Serialize;
 
 use crate::error::Crypt4GHError;
 use crate::keys::{KeyPair, PublicKey};
+
+/// Crypt4gh spec §3.4.2
+pub const PLAINTEXT_SEGMENT_SIZE: u8 = 65535;
+pub struct Segment { // FIXME: select(method) within struct, should be modeled or just name the struct accordingly?
+	nonce: Vec<u8>, // FIXME: With capacity 12? Define a newtype perhaps
+	encrypted_data: Vec<u8>,
+	mac: Vec<u8> // FIXME: With capacity 16? Define a newtype perhaps
+}
 
 #[derive(Clone)]
 pub struct Crypt4Gh {
@@ -52,8 +63,9 @@ impl<'a> Crypt4Gh {
 
 		// TODO: Leverage (Async)Read trait
 		// TODO: Perhaps with slices of bytes/Vecs? Bytes crate?
-		match range {
-			None | Some(0) => loop {
+		match self.range {
+			plaintext.reader
+			0 => loop {
 				todo!()
 			},
 
@@ -61,6 +73,22 @@ impl<'a> Crypt4Gh {
 				todo!()
 			},
 		}
+
+		// FIXME: Pseudocode to substitute the intricated match above from the original implementation...
+		//
+		// fn process_chunks(plaintext: Vec<u8>, recipients: Vec<String>, chunk_size: usize) -> Vec<u8> {
+		// 	plaintext
+		// 		.chunks(chunk_size)
+		// 		.enumerate()
+		// 		.flat_map(|(i, chunk)| {
+		// 			if i == 0 {
+		// 				process_first_chunk(chunk, &recipients)
+		// 			} else {
+		// 				process_subsequent_chunk(chunk)
+		// 			}
+		// 		})
+		// 		.collect()
+		// }
 	}
 
 	pub fn decrypt(self, cyphertext: CypherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
@@ -100,6 +128,15 @@ impl Crypt4GhBuilder {
 			range: self.range.unwrap_or(0..usize::MAX),
 			seed: self.seed.unwrap_or(Seed { inner: OsRng.gen() }),
 		}
+	}
+
+	/// Encrypts a segment.
+	///
+	/// Returns [ nonce + `encrypted_data` ].
+	pub fn encrypt_segment(data: &[u8], nonce: Nonce, key: &HeaderSymmetricKey) -> Result<Vec<u8>, Crypt4GHError> {
+		let cipher = ChaCha20Poly1305::new(key);
+		let ciphertext = cipher.encrypt(&nonce, data).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
+		Ok(vec![nonce.to_vec(), ciphertext].concat())
 	}
 }
 /// Computes the encrypted header part for each key in the given collection
@@ -181,6 +218,7 @@ fn encrypt_x25519_chacha20_poly1305(
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Recipients {
 	pub public_keys: Vec<PublicKey>,
+	//pub private_keys: Option<Vec<PrivateKey>>
 }
 
 impl Recipients {
@@ -196,4 +234,14 @@ impl Recipients {
 #[derive(Clone)]
 pub struct Seed {
 	pub inner: [u8; 32],
+}
+
+#[derive(Debug, Serialize)]
+pub struct Nonce {
+	pub inner: [u8; 12],
+}
+
+#[derive(Debug, Serialize)]
+pub struct Mac {
+	pub inner: [u8; 16],
 }

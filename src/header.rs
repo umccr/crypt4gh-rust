@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Crypt4GHError;
 use crate::keys::{EncryptionMethod, PrivateKey, PublicKey, SessionKeys};
-use crate::{construct_encrypted_data_packet, Crypt4Gh, CypherText, Recipients, Seed};
+use crate::{construct_encrypted_data_packet, CypherText, Mac, Nonce, Recipients, Seed};
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -65,9 +65,9 @@ pub struct HeaderPacket {
 	packet_length: u32,
 	encryption_method: EncryptionMethod,
 	writer_public_key: PublicKey,
-	nonce: Vec<u8>,
+	nonce: Nonce,
 	encrypted_payload: Vec<u8>,
-	mac: Vec<u8>, /* dalek::Mac type might be more fitting
+	mac: Mac,     /* dalek::Mac type might be more fitting
 	               * TODO: MAC[16] for chacha20_ietf_poly1305 */
 }
 

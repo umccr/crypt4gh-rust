@@ -131,13 +131,13 @@ impl KeyPair {
 }
 
 impl PublicKey {
-	/// Generate a new sender public key.
+	/// Generate a new (random) public key.
 	pub fn new() -> Self {
 		let bytes = ChaCha20Poly1305::generate_key(OsRng).to_vec();
 		PublicKey { bytes }
 	}
 
-	/// Create a new sender public key from bytes.
+	/// Create a new public key from bytes.
 	pub fn from(bytes: Vec<u8>) -> Self {
 		Self { bytes }
 	}
