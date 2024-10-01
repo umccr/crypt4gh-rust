@@ -1,6 +1,6 @@
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
 use crypto_kx;
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
 
 use crate::Recipients;
@@ -41,7 +41,15 @@ pub struct SessionKeys {
 
 impl SessionKeys {
 	/// Create a new SessionKeys instance.
-	pub fn new(inner: Vec<Vec<u8>>) -> Self {
+	pub fn new() -> Self {
+		let mut rng = OsRng;
+		let inner = (0..10) // FIXME: Assuming we want 10 session keys, needs to be discussed
+			.map(|_| {
+				let mut key = vec![0u8; 32]; // FIXME: Assuming each session key is 32 bytes... parametrise?
+				rng.try_fill_bytes(&mut key);
+				key
+			})
+			.collect();
 		Self { inner: Some(inner) }
 	}
 

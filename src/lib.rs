@@ -51,23 +51,16 @@ pub struct Crypt4GhBuilder {
 
 impl<'a> Crypt4Gh {
 	pub fn encrypt(&self, plaintext: PlainText, recipients: Recipients) -> &Self {
-		let session_key = SessionKeys::from(Vec::with_capacity(32));
+		let session_key = SessionKeys::new();
 		let mut rnd = ChaCha20Rng::from_seed(self.seed.inner);
-		let mut offset = 0;
+		let mut cursor: usize = 0; // TODO: Use std::io::Cursor?
 		let mut cyphertext = CypherText::new();
 		let nonce = Nonce::new();
-
-		// random bytes into session_key
-		// FIXME: Support multiple session keys? Refactor SessionKeys type to single session_key if not used.
-		rnd.try_fill_bytes(&mut session_key.inner.clone().unwrap()[0])
-			.map_err(|_| Crypt4GHError::NoRandomNonce);
 
 		// Encrypt segments
 		for segment in plaintext.chunks(PLAINTEXT_SEGMENT_SIZE) {
 			let encrypted_segment = Crypt4GhBuilder::encrypt_segment(segment, &nonce, &session_key);
 			cyphertext.append_segment(encrypted_segment.unwrap().as_slice());
-			offset += segment.len();
-			// TODO: Take care of last segment and other corner cases
 		}
 		Ok(self) // FIXME: This function should return Result<Self> maybe? (see .unwrap() above coming from encrypt_segment)
 	}
