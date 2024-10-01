@@ -28,4 +28,12 @@ impl PlainText {
 	pub fn length(&self) -> usize {
 		self.inner.len()
 	}
+
+	pub fn as_slice(&self) -> &[u8] {
+		&self.inner
+	}
+
+	pub fn chunks(&self, chunk_size: usize) -> impl Iterator<Item = &[u8]> {
+		self.inner.chunks(chunk_size)
+	}
 }

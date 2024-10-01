@@ -7,6 +7,7 @@ pub mod plaintext;
 use std::collections::HashSet;
 use std::ops::RangeBounds;
 use std::os::unix::process;
+use std::slice::Chunks;
 
 use chacha20poly1305::aead::generic_array::GenericArray;
 use chacha20poly1305::aead::Aead;
@@ -28,7 +29,7 @@ use crate::error::Crypt4GHError;
 use crate::keys::{KeyPair, PublicKey};
 
 /// Crypt4gh spec §3.4.2
-pub const PLAINTEXT_SEGMENT_SIZE: u8 = 65535;
+pub const PLAINTEXT_SEGMENT_SIZE: usize = 65535;
 pub struct Segment { // FIXME: select(method) within struct, should be modeled or just name the struct accordingly?
 	nonce: Vec<u8>, // FIXME: With capacity 12? Define a newtype perhaps
 	encrypted_data: Vec<u8>,
@@ -52,43 +53,23 @@ impl<'a> Crypt4Gh {
 	pub fn encrypt(&self, plaintext: PlainText, recipients: Recipients) -> &Self {
 		let session_key = SessionKeys::from(Vec::with_capacity(32));
 		let mut rnd = ChaCha20Rng::from_seed(self.seed.inner);
+		let mut offset = 0;
+		let mut cyphertext = CypherText::new();
+		let nonce = Nonce::new();
 
 		// random bytes into session_key
 		// FIXME: Support multiple session keys? Refactor SessionKeys type to single session_key if not used.
 		rnd.try_fill_bytes(&mut session_key.inner.clone().unwrap()[0])
 			.map_err(|_| Crypt4GHError::NoRandomNonce);
 
-		let mut nonce_bytes = [0u8; 12];
-		rnd.fill(&mut nonce_bytes);
-
-		// TODO: Leverage (Async)Read trait
-		// TODO: Perhaps with slices of bytes/Vecs? Bytes crate?
-		match self.range {
-			plaintext.reader
-			0 => loop {
-				todo!()
-			},
-
-			Some(mut remaining_length) => {
-				todo!()
-			},
+		// Encrypt segments
+		for segment in plaintext.chunks(PLAINTEXT_SEGMENT_SIZE) {
+			let encrypted_segment = Crypt4GhBuilder::encrypt_segment(segment, &nonce, &session_key);
+			cyphertext.append_segment(encrypted_segment.unwrap().as_slice());
+			offset += segment.len();
+			// TODO: Take care of last segment and other corner cases
 		}
-
-		// FIXME: Pseudocode to substitute the intricated match above from the original implementation...
-		//
-		// fn process_chunks(plaintext: Vec<u8>, recipients: Vec<String>, chunk_size: usize) -> Vec<u8> {
-		// 	plaintext
-		// 		.chunks(chunk_size)
-		// 		.enumerate()
-		// 		.flat_map(|(i, chunk)| {
-		// 			if i == 0 {
-		// 				process_first_chunk(chunk, &recipients)
-		// 			} else {
-		// 				process_subsequent_chunk(chunk)
-		// 			}
-		// 		})
-		// 		.collect()
-		// }
+		Ok(self) // FIXME: This function should return Result<Self> maybe? (see .unwrap() above coming from encrypt_segment)
 	}
 
 	pub fn decrypt(self, cyphertext: CypherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
@@ -133,9 +114,9 @@ impl Crypt4GhBuilder {
 	/// Encrypts a segment.
 	///
 	/// Returns [ nonce + `encrypted_data` ].
-	pub fn encrypt_segment(data: &[u8], nonce: Nonce, key: &HeaderSymmetricKey) -> Result<Vec<u8>, Crypt4GHError> {
+	pub fn encrypt_segment(data: &[u8], nonce: &Nonce, key: &HeaderSymmetricKey) -> Result<Vec<u8>, Crypt4GHError> {
 		let cipher = ChaCha20Poly1305::new(key);
-		let ciphertext = cipher.encrypt(&nonce, data).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
+		let ciphertext = cipher.encrypt(nonce, data).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
 		Ok(vec![nonce.to_vec(), ciphertext].concat())
 	}
 }
@@ -244,4 +225,15 @@ pub struct Nonce {
 #[derive(Debug, Serialize)]
 pub struct Mac {
 	pub inner: [u8; 16],
+}
+
+impl Nonce {
+	pub fn new() -> Self {
+		// TODO: Use this instead?
+		//let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
+
+		let mut nonce = [0u8; 12];
+		OsRng.fill_bytes(&mut nonce);
+		Nonce { inner: nonce }
+	}
 }

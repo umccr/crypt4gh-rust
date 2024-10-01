@@ -9,6 +9,10 @@ pub struct CypherText {
 }
 
 impl CypherText {
+	pub fn new() -> Self {
+		CypherText { inner: Vec::new() }
+	}
+
 	pub fn from(vec: Vec<u8>) -> Self {
 		CypherText { inner: vec }
 	}
@@ -17,5 +21,9 @@ impl CypherText {
 		let cg4h = Crypt4Gh::new(keys);
 		let plaintext = cg4h.decrypt(self)?;
 		Ok(plaintext)
+	}
+
+	pub fn append_segment(&mut self, segment: &[u8]) {
+		self.inner.extend_from_slice(segment);
 	}
 }
