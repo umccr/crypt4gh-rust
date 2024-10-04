@@ -1,3 +1,5 @@
+/// Implements Crypt4GH §2.1 (Keys)
+
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
 use crypto_kx;
 use rand::{rngs::OsRng, RngCore};
@@ -14,6 +16,8 @@ pub enum EncryptionMethod {
 	Aes256Gcm,
 }
 
+/// Crypt4GH §2.1.1 Asymmetric Keys
+
 /// Public/Private KeyPair information.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct KeyPair {
@@ -25,6 +29,15 @@ pub struct KeyPair {
 	/// Public key(s) of the recipient(s)
 	pub public_keys: Recipients,
 }
+/// Crypt4Gh spec §2.1.2
+/// K_data: Symmetric data key stored in data encryption parameters header packet
+///
+/// It is possible to encrypt parts of a file with different data keys, in which case each key will be 
+/// stored in a separate data encryption parameters header packet.
+pub struct DataKeys {
+	inner: Vec<Vec<u8>>
+}
+
 
 /// Represents a collection of session keys.
 ///
