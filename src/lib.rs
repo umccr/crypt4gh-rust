@@ -112,6 +112,11 @@ impl Crypt4GhBuilder {
 		let ciphertext = cipher.encrypt(nonce, data).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
 		Ok(vec![nonce.to_vec(), ciphertext].concat())
 	}
+
+	pub fn add_recipient(mut self, recipient: PublicKey) -> Self {
+		self.keys.public_keys.add(recipient);
+		self
+	}
 }
 /// Computes the encrypted header part for each key in the given collection
 ///
@@ -202,6 +207,10 @@ impl Recipients {
 
 	pub fn is_empty(&self) -> bool {
 		self.public_keys.is_empty()
+	}
+
+	pub fn add(&mut self, public_key: PublicKey) {
+		self.public_keys.push(public_key);
 	}
 }
 
