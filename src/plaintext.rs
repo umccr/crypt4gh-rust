@@ -9,6 +9,10 @@ pub struct PlainText {
 	inner: Vec<u8>,
 }
 
+pub struct PlainTextReader {
+	// TODO: Reader
+}
+
 impl PlainText {
 	pub fn from(payload: Vec<u8>) -> Self {
 		PlainText { inner: payload }

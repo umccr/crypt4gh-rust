@@ -6,8 +6,6 @@ pub mod plaintext;
 
 use std::collections::HashSet;
 use std::ops::RangeBounds;
-use std::os::unix::process;
-use std::slice::Chunks;
 
 use chacha20poly1305::aead::generic_array::GenericArray;
 use chacha20poly1305::aead::Aead;
@@ -17,7 +15,6 @@ use crypto_kx::{Keypair as CryptoKeyPair, PublicKey as CryptoPubKey, SecretKey a
 use cyphertext::CypherText;
 use header::HeaderPacketType;
 use keys::{EncryptionMethod, PrivateKey, SessionKeys};
-use noodles::cram::r#async::io::reader;
 use plaintext::PlainText;
 use rand::rngs::OsRng;
 use rand::{Rng, RngCore};
@@ -30,10 +27,11 @@ use crate::keys::{KeyPair, PublicKey};
 
 /// Crypt4gh spec §3.4.2
 pub const PLAINTEXT_SEGMENT_SIZE: usize = 65535;
-pub struct Segment { // FIXME: select(method) within struct, should be modeled or just name the struct accordingly?
-	nonce: Vec<u8>, // FIXME: With capacity 12? Define a newtype perhaps
-	encrypted_data: Vec<u8>,
-	mac: Vec<u8> // FIXME: With capacity 16? Define a newtype perhaps
+pub struct Segment { // FIXME: Spec pseudo-code states "select(encryption_method)" within struct
+					 // how should this be implemented?
+	nonce: Nonce,
+	encrypted_data: CypherText,
+	mac: Mac,
 }
 
 #[derive(Clone)]
@@ -50,19 +48,21 @@ pub struct Crypt4GhBuilder {
 }
 
 impl<'a> Crypt4Gh {
-	pub fn encrypt(&self, plaintext: PlainText, recipients: Recipients) -> &Self {
+	pub fn encrypt(&self, plaintext: PlainText, recipients: Recipients) -> Result<CypherText, Crypt4GHError> {
 		let session_key = SessionKeys::new();
 		let mut rnd = ChaCha20Rng::from_seed(self.seed.inner);
 		let mut cursor: usize = 0; // TODO: Use std::io::Cursor?
 		let mut cyphertext = CypherText::new();
-		let nonce = Nonce::new();
+		let nonce = Nonce::new(); // FIXME: Careful, nonce should be re-calculated for each header packet
+										 // unclear if the original implementation did that?
 
 		// Encrypt segments
 		for segment in plaintext.chunks(PLAINTEXT_SEGMENT_SIZE) {
 			let encrypted_segment = Crypt4GhBuilder::encrypt_segment(segment, &nonce, &session_key);
-			cyphertext.append_segment(encrypted_segment.unwrap().as_slice());
+			cyphertext.append_segment(encrypted_segment?.as_slice());
 		}
-		Ok(self) // FIXME: This function should return Result<Self> maybe? (see .unwrap() above coming from encrypt_segment)
+
+		Ok(cyphertext)
 	}
 
 	pub fn decrypt(self, cyphertext: CypherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {

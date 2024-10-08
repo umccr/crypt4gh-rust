@@ -62,7 +62,7 @@ enum HeaderPacketDataType {
 /// as described in the spec can be selected at runtime
 #[derive(Debug, Serialize)]
 pub struct HeaderPacket {
-	packet_length: u32,
+	packet_length: u32, // packet length is the length of the entire header packet (including the packet length itself)
 	encryption_method: EncryptionMethod,
 	writer_public_key: PublicKey,
 	nonce: Nonce,
