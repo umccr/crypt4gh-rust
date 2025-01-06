@@ -29,15 +29,44 @@ pub struct KeyPair {
 	/// Public key(s) of the recipient(s)
 	pub public_keys: Recipients,
 }
+
 /// Crypt4Gh spec §2.1.2
-/// K_data: Symmetric data key stored in data encryption parameters header packet
+/// K_data: Symmetric data key stored in data encryption parameters header packet.
 ///
 /// It is possible to encrypt parts of a file with different data keys, in which case each key will be 
 /// stored in a separate data encryption parameters header packet.
+/// 
+/// Data Keys are used to encrypt the actual data payload of the file(s) or data stream(s).
 pub struct DataKeys {
 	inner: Vec<Vec<u8>>
 }
 
+impl DataKeys {
+	/// Create a new DataKeys instance.
+	pub fn new() -> Self {
+		Self { inner: Vec::new() }
+	}
+
+	/// Add a data key to the inner keys.
+	pub fn add_key(&mut self, key: Vec<u8>) {
+		self.inner.push(key);
+	}
+
+	/// Get the inner data keys.
+	pub fn inner(&self) -> &Vec<Vec<u8>> {
+		&self.inner
+	}
+
+	/// Convert the data keys to bytes.
+	pub fn to_bytes(&self) -> Vec<u8> {
+		self.inner.iter().flat_map(|key| key.clone()).collect()
+	}
+
+	/// Convert the data keys to a single vector of bytes.
+	pub fn to_vec(&self) -> Vec<u8> {
+		self.to_bytes()
+	}
+}
 
 /// Represents a collection of session keys.
 ///

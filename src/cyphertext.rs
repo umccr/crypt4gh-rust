@@ -1,7 +1,7 @@
 use crate::error::Crypt4GHError;
 use crate::keys::KeyPair;
 use crate::plaintext::PlainText;
-use crate::Crypt4Gh;
+use crate::Crypt4GhBuilder;
 
 #[derive(Debug)]
 pub struct CypherText {
@@ -18,8 +18,8 @@ impl CypherText {
 	}
 
 	pub fn decrypt(self, keys: KeyPair) -> Result<PlainText, Crypt4GHError> {
-		let cg4h = Crypt4Gh::new(keys);
-		let plaintext = cg4h.decrypt(self)?;
+		let cg4h = Crypt4GhBuilder::new(keys.clone()).build();
+		let plaintext = cg4h.decrypt(self, keys.private_key)?;
 		Ok(plaintext)
 	}
 

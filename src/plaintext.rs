@@ -1,7 +1,7 @@
 use crate::cyphertext::CypherText;
 use crate::error::Crypt4GHError;
 use crate::keys::KeyPair;
-use crate::{Crypt4Gh, Recipients};
+use crate::{Crypt4GhBuilder, Recipients};
 
 /// Plaintext newtype, avoids API misuse
 #[derive(Debug)]
@@ -24,8 +24,9 @@ impl PlainText {
 		recipients: Recipients,
 		keys: KeyPair,
 	) -> Result<CypherText, Crypt4GHError> {
-		let cg4h = Crypt4Gh::new(keys);
-		let cyphertext = cg4h.encrypt(plaintext, recipients).with_range(plaintext.length())?;
+		// FIXME: Revisit builder and/or this function to adjust .with_range() bounds.
+		let cg4h = Crypt4GhBuilder::new(keys).with_range(0..plaintext.length()).build();
+		let cyphertext = cg4h.encrypt(plaintext, recipients)?;
 		Ok(cyphertext)
 	}
 

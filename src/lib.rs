@@ -14,12 +14,10 @@ use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair as CryptoKeyPair, PublicKey as CryptoPubKey, SecretKey as CryptoSecretKey};
 use cyphertext::CypherText;
 use header::HeaderPacketType;
-use keys::{EncryptionMethod, PrivateKey, SessionKeys};
+use keys::{DataKeys, EncryptionMethod, PrivateKey, SessionKeys};
 use plaintext::PlainText;
 use rand::rngs::OsRng;
 use rand::{Rng, RngCore};
-use rand_chacha::rand_core::SeedableRng;
-use rand_chacha::ChaCha20Rng;
 use serde::Serialize;
 
 use crate::error::Crypt4GHError;
@@ -49,16 +47,17 @@ pub struct Crypt4GhBuilder {
 
 impl<'a> Crypt4Gh {
 	pub fn encrypt(&self, plaintext: PlainText, recipients: Recipients) -> Result<CypherText, Crypt4GHError> {
-		let session_key = SessionKeys::new();
-		let mut rnd = ChaCha20Rng::from_seed(self.seed.inner);
-		let mut cursor: usize = 0; // TODO: Use std::io::Cursor?
+		// let session_keys = SessionKeys::new();
+		let data_keys = DataKeys::new();
+		// let mut rnd = ChaCha20Rng::from_seed(self.seed.inner);
+		// let mut cursor: usize = 0; // TODO: Use std::io::Cursor?
 		let mut cyphertext = CypherText::new();
 		let nonce = Nonce::new(); // FIXME: Careful, nonce should be re-calculated for each header packet
 										 // unclear if the original implementation did that?
 
 		// Encrypt segments
 		for segment in plaintext.chunks(PLAINTEXT_SEGMENT_SIZE) {
-			let encrypted_segment = Crypt4GhBuilder::encrypt_segment(segment, &nonce, &session_key);
+			let encrypted_segment = Crypt4GhBuilder::encrypt_segment(segment, &nonce, &data_keys);
 			cyphertext.append_segment(encrypted_segment?.as_slice());
 		}
 
@@ -69,6 +68,8 @@ impl<'a> Crypt4Gh {
 		todo!();
 		// Ok(PlainText::from("payload".as_bytes().to_vec()))
 	}
+
+	
 }
 
 impl Crypt4GhBuilder {
@@ -110,9 +111,16 @@ impl Crypt4GhBuilder {
 	/// 
 	// TODO: Multiple (data) keys now, so adapt accordingly
 	pub fn encrypt_segment(data: &[u8], nonce: &Nonce, keys: &DataKeys) -> Result<Vec<u8>, Crypt4GHError> {
-		let cipher = ChaCha20Poly1305::new(key);
-		let ciphertext = cipher.encrypt(nonce, data).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
-		Ok(vec![nonce.to_vec(), ciphertext].concat())
+		// Convert Crypt4GH to RustCrypto primitives/cipher
+		let key_array = GenericArray::clone_from_slice(&keys.to_bytes());
+		let cipher = ChaCha20Poly1305::new(&key_array);
+
+		// Same for Nonce
+		let nonce_array = GenericArray::from_slice(&nonce.inner);
+		let ciphertext = cipher.encrypt(nonce_array, data).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
+
+
+		Ok([nonce_array.as_slice(), &ciphertext].concat())
 	}
 
 	pub fn add_recipient(mut self, recipient: PublicKey) -> Self {
@@ -120,6 +128,7 @@ impl Crypt4GhBuilder {
 		self
 	}
 }
+
 /// Computes the encrypted header part for each key in the given collection
 ///
 /// Given a set of keys and a vector of bytes representing a packet, this function iterates over the keys and encrypts the packet using the x25519_chacha20_poly1305 encryption method.

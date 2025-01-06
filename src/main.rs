@@ -2,16 +2,17 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use crypt4gh::error::Crypt4GHError;
-use crypt4gh::keys::{EncryptionMethod, KeyPair, PrivateKey, PublicKey};
+use crypt4gh::keys::{self, EncryptionMethod, KeyPair, PrivateKey, PublicKey};
 use crypt4gh::plaintext::PlainText;
-use crypt4gh::{Crypt4Gh, Recipients};
+use crypt4gh::{Crypt4Gh, Crypt4GhBuilder, Recipients};
 use noodles::cram;
 use tokio::fs::File;
 
 async fn read_cram_header(src: PathBuf) -> Result<String, Crypt4GHError> {
 	let mut reader = File::open(src).await.map(cram::AsyncReader::new)?;
 	let header = reader.read_header().await?;
-	Ok(header)
+	let header_str = format!("{:?}", header); // FIXME: Yikes...
+	Ok(header_str)
 }
 
 #[tokio::main]
@@ -25,7 +26,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 	let private_key = keypair.private_key;
 
 	// Init the Crypt4GH client
-	let c4gh = Crypt4GhBuilder::new(keys.clone()).build();
+	let c4gh = Crypt4GhBuilder::new(keypair).build();
 	//.with_range(..);
 
 	// Read header bytes from a CRAM file
