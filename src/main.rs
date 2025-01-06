@@ -2,9 +2,9 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use crypt4gh::error::Crypt4GHError;
-use crypt4gh::keys::{self, EncryptionMethod, KeyPair, PrivateKey, PublicKey};
+use crypt4gh::keys::{EncryptionMethod, KeyPair, PrivateKey, PublicKey};
 use crypt4gh::plaintext::PlainText;
-use crypt4gh::{Crypt4Gh, Crypt4GhBuilder, Recipients};
+use crypt4gh::{Crypt4GhBuilder, Recipients};
 use noodles::cram;
 use tokio::fs::File;
 
@@ -22,11 +22,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 	pubkeys.push(PublicKey::new());
 
 	let privkey = PrivateKey::new();
-	let keypair = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, privkey, pubkeys);
-	let private_key = keypair.private_key;
+	let keypair = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, privkey, crypt4gh::Recipients { public_keys: pubkeys.clone() });
 
 	// Init the Crypt4GH client
-	let c4gh = Crypt4GhBuilder::new(keypair).build();
+	let c4gh = Crypt4GhBuilder::new(keypair.clone()).build();
 	//.with_range(..);
 
 	// Read header bytes from a CRAM file
@@ -38,10 +37,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 	let plaintext = PlainText::from(cram_header);
 
 	// Encrypt and decrypt payload
-	let recipients = Recipients::from(pubkeys);
+	let recipients = Recipients::from(pubkeys.clone());
 
-	let enc = c4gh.encrypt(plaintext, recipients);
-	let dec = enc.decrypt(private_key)?;
+	let enc = c4gh.encrypt(plaintext, recipients)?;
+	let dec = enc.decrypt(keypair)?;
 
 	dbg!(dec);
 
