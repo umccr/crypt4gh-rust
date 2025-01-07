@@ -3,6 +3,7 @@ pub mod error;
 pub mod header;
 pub mod keys;
 pub mod plaintext;
+pub mod io;
 
 use std::collections::HashSet;
 use std::ops::RangeBounds;

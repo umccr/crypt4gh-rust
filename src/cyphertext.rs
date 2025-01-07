@@ -3,6 +3,10 @@ use crate::keys::KeyPair;
 use crate::plaintext::PlainText;
 use crate::Crypt4GhBuilder;
 
+pub struct Reader<R> {
+	inner: R,
+}
+
 #[derive(Debug)]
 pub struct CypherText {
 	inner: Vec<u8>,

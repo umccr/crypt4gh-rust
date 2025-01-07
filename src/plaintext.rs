@@ -9,8 +9,14 @@ pub struct PlainText {
 	inner: Vec<u8>,
 }
 
-pub struct PlainTextReader {
-	// TODO: Reader
+pub struct Reader<R> {
+	inner: R,
+}
+
+impl<R> Reader<R> {
+	pub fn new(inner: R) -> Self {
+		Reader { inner }
+	}
 }
 
 impl PlainText {
@@ -24,7 +30,7 @@ impl PlainText {
 		recipients: Recipients,
 		keys: KeyPair,
 	) -> Result<CypherText, Crypt4GHError> {
-		// FIXME: Revisit builder and/or this function to adjust .with_range() bounds.
+		// FIXME: Revisit builder and/or this function to adjust .with_range() bounds... 0 is incorrect
 		let cg4h = Crypt4GhBuilder::new(keys).with_range(0..plaintext.length()).build();
 		let cyphertext = cg4h.encrypt(plaintext, recipients)?;
 		Ok(cyphertext)
