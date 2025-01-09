@@ -7,11 +7,12 @@ edition = "2021"
 # Interesting substitute: https://crates.io/crates/fastcrypto
 base64ct = "1"
 bincode = "1.3.3"
-chacha20poly1305 = "0.10"
+chacha20poly1305 = { version = "0.10" }
 crypto_kx = "0.2.1"
 noodles = { version = "0.79", features = ["async", "cram"] }
 rand = "0.8"
 rand_chacha = { version = "0.3" } # Requires nightly, but interesting to enable in the future: features = [ "simd" ] }
 serde = { version = "1", features = ["derive"] }
+ssh-key = { version = "0.6.7", no-default-features=true, features=["ed25519"] }
 thiserror = { version = "1" }
 tokio = { version = "1", features = [ "io-util", "test-util", "macros", "rt-multi-thread" ] }

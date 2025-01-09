@@ -13,6 +13,10 @@ pub struct Reader<R> {
 	inner: R,
 }
 
+pub struct Writer<W> {
+	inner: W,
+}
+
 impl<R> Reader<R> {
 	pub fn new(inner: R) -> Self {
 		Reader { inner }

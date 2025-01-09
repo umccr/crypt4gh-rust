@@ -1,7 +1,6 @@
-use chacha20poly1305::Key;
 use tokio::io::AsyncRead;
 
-use crate::{cyphertext::{self, CypherText}, error::Crypt4GHError, keys::KeyPair, plaintext::{self, PlainText}, Crypt4GhBuilder};
+use crate::{cyphertext::CypherText, error::Crypt4GHError, keys::KeyPair, plaintext::PlainText, Crypt4GhBuilder};
 
 pub struct Reader<R> {
     inner: R,

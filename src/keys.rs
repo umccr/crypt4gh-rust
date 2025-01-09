@@ -1,9 +1,14 @@
+use std::io::Read;
+
 /// Implements Crypt4GH §2.1 (Keys)
 
-use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
+use chacha20poly1305::{aead::generic_array::GenericArray, ChaCha20Poly1305, Key, KeyInit};
+use chacha20poly1305::consts::U32;
 use crypto_kx;
 use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
+// TODO: We'll need to accomodate types such as Crypt4GHPubkey, Crypt4GHPrivkey
+use ssh_key::{public::PublicKey as SSHPublicKey, public::Ed25519PublicKey};
 
 use crate::Recipients;
 
@@ -88,7 +93,7 @@ impl SessionKeys {
 		let inner = (0..10) // FIXME: Assuming we want 10 session keys, needs to be discussed
 			.map(|_| {
 				let mut key = vec![0u8; 32]; // FIXME: Assuming each session key is 32 bytes... parametrise?
-				rng.try_fill_bytes(&mut key);
+				let _ = rng.try_fill_bytes(&mut key);
 				key
 			})
 			.collect();
@@ -134,8 +139,10 @@ pub struct PrivateKey {
 
 /// A wrapper around a vec of bytes that represent a public key.
 #[derive(Debug, Clone, PartialEq, Hash, Eq, Serialize)]
-pub struct PublicKey {
-	pub bytes: Vec<u8>,
+pub enum PublicKey {
+	SSHPublicKey,
+	Crypt4GHPublicKey,
+	ChaCha20Poly1305(GenericArray<u8, U32>),
 }
 
 impl KeyPair {
@@ -183,8 +190,7 @@ impl KeyPair {
 impl PublicKey {
 	/// Generate a new (random) public key.
 	pub fn new() -> Self {
-		let bytes = ChaCha20Poly1305::generate_key(OsRng).to_vec();
-		PublicKey { bytes }
+		PublicKey::ChaCha20Poly1305(ChaCha20Poly1305::generate_key(OsRng).bytes())
 	}
 
 	/// Create a new public key from bytes.
@@ -252,4 +258,12 @@ impl PrivateKey {
 	pub fn len(&self) -> usize {
 		self.bytes.len()
 	}
+}
+
+pub fn get_brainstorm_public_key() -> Ed25519PublicKey {
+    *SSHPublicKey::from_openssh("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICWwC2CWtve93K0BubV0gf74kvzDG9WM5SfXAAcr+5dy rvalls@Romans-MBP.lan")
+        .unwrap()
+        .key_data()
+        .ed25519()
+        .unwrap()
 }
