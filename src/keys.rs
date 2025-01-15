@@ -18,12 +18,8 @@ pub enum EncryptionMethod {
 	Aes256Gcm,
 }
 
-// User -> private/public -> generate -> GenerateKeyPair.02x
-// User -> private/public, public_key -> Send to them.
-
-
 /// Crypt4GH §2.1.1 Asymmetric Keys
-
+/// 
 /// Public/Private KeyPair information.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct KeyPair {
@@ -36,8 +32,29 @@ pub struct KeyPair {
 	pub public_keys: Recipients,
 }
 
-/// Crypt4Gh spec §2.1.2
-/// K_data: Symmetric data key stored in data encryption parameters header packet.
+/// Crypt4Gh spec Symmetric Keys §2.1.2
+///
+
+/// Shared key(s), also known as K_shared
+/// 
+/// Used to encrypt header packet data. 
+/// It can be derived either from (Ksw and Kpr) or from
+/// (Ksr and Kpw) - see section 3.3.1.
+/// 
+/// The writer will use the first of these derivations 
+/// and the reader will use the second
+
+pub struct SharedKeys {
+	inner: Vec<Vec<u8>>
+}
+
+impl SharedKeys {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.inner.concat() // FIXME: Review
+    }
+}
+
+/// Data key(s), also known as K_data: Symmetric data key stored in data encryption parameters header packet.
 ///
 /// It is possible to encrypt parts of a file with different data keys, in which case each key will be 
 /// stored in a separate data encryption parameters header packet.

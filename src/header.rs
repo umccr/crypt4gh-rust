@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::Crypt4GHError;
-use crate::keys::{EncryptionMethod, PrivateKey, PublicKey, SessionKeys};
+use crate::keys::{EncryptionMethod, PrivateKey, PublicKey, SharedKeys};
 use crate::{construct_encrypted_data_packet, CypherText, Mac, Nonce, Recipients, Seed};
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
@@ -104,11 +104,11 @@ impl Header {
 	/// Encrypt just the header
 	pub fn encrypt(
 		recipients: Recipients,
-		session_keys: Option<SessionKeys>,
+		shared_keys: Option<SharedKeys>,
 		seed: Seed,
 	) -> Result<CypherText, Crypt4GHError> {
 		// Invariant: Starts at position 0, so no >0 range offsets are needed for header itself and this function?
-		let header_content = construct_encrypted_data_packet(EncryptionMethod::X25519Chacha20Poly305, session_keys);
+		let header_content = construct_encrypted_data_packet(EncryptionMethod::X25519Chacha20Poly305, shared_keys);
 		// let header_packets = crate::Crypt4Gh::encrypt(&header_content, recipients, None)?;
 		// let header_bytes = serialize_header_packets(header_packets);
 

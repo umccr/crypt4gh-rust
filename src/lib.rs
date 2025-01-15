@@ -12,10 +12,10 @@ use chacha20poly1305::aead::generic_array::GenericArray;
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::consts::U32;
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
-use crypto_kx::{Keypair as CryptoKeyPair, PublicKey as CryptoPubKey, SecretKey as CryptoSecretKey};
+use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
 use cyphertext::CypherText;
 use header::HeaderPacketType;
-use keys::{DataKeys, EncryptionMethod, PrivateKey, SessionKeys};
+use keys::{DataKeys, EncryptionMethod, PrivateKey, SharedKeys};
 use plaintext::PlainText;
 use rand::rngs::OsRng;
 use rand::{Rng, RngCore};
@@ -150,7 +150,7 @@ pub fn compute_encrypted_header(packet: &[u8], keys: &HashSet<KeyPair>) -> Resul
 }
 
 /// Constructs an encrypted data packet with the given encryption method and session keys
-fn construct_encrypted_data_packet(encryption_method: EncryptionMethod, session_keys: Option<SessionKeys>) -> Vec<u8> {
+fn construct_encrypted_data_packet(encryption_method: EncryptionMethod, session_keys: Option<SharedKeys>) -> Vec<u8> {
 	vec![
 		bincode::serialize(&HeaderPacketType::DataEnc).expect("Unable to serialize packet type"),
 		(encryption_method as u32).to_le_bytes().to_vec(),
