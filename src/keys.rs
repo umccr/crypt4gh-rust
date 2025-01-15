@@ -1,9 +1,6 @@
-use std::io::Read;
-
 /// Implements Crypt4GH §2.1 (Keys)
 
-use chacha20poly1305::{aead::generic_array::GenericArray, ChaCha20Poly1305, KeyInit};
-use chacha20poly1305::consts::U32;
+use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
 use crypto_kx;
 use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
@@ -77,63 +74,6 @@ impl DataKeys {
 	}
 }
 
-/// Represents a collection of session keys.
-///
-/// The `SessionKeys` struct contains an optional vector of vectors of bytes,
-/// which can be used to store multiple session keys.
-///
-/// # Fields
-///
-/// * `inner` - An optional vector of vectors of bytes representing the session keys.
-#[derive(Debug)]
-pub struct SessionKeys {
-	pub inner: Option<Vec<Vec<u8>>>,
-}
-
-impl SessionKeys {
-	/// Create a new SessionKeys instance.
-	pub fn new() -> Self {
-		let mut rng = OsRng;
-		let inner = (0..10) // FIXME: Assuming we want 10 session keys, needs to be discussed
-			.map(|_| {
-				let mut key = vec![0u8; 32]; // FIXME: Assuming each session key is 32 bytes... parametrise?
-				let _ = rng.try_fill_bytes(&mut key);
-				key
-			})
-			.collect();
-		Self { inner: Some(inner) }
-	}
-
-	/// Get the inner session keys.
-	pub fn inner(&self) -> &Option<Vec<Vec<u8>>> {
-		&self.inner
-	}
-
-	/// Create a new SessionKeys instance from a slice of session keys.
-	pub fn from(session_keys: Vec<Vec<u8>>) -> Self {
-		Self {
-			inner: Some(session_keys),
-		}
-	}
-
-	/// Convert the session keys to bytes.
-	pub fn to_bytes(&self) -> Vec<u8> {
-		match &self.inner {
-			Some(keys) => keys.iter().flat_map(|key| key.clone()).collect(),
-			None => vec![],
-		}
-	}
-
-	/// Convert the session keys to a single vector of bytes.
-	pub fn to_vec(&self) -> Vec<u8> {
-		self.to_bytes()
-	}
-
-	/// Add a session key to the inner session keys.
-	pub fn add_session_key(&mut self, session_key: Vec<u8>) {
-		Some(session_key);
-	}
-}
 
 /// Private keys are just bytes since it should support disparate formats, i.e: SSH and GA4GH
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
@@ -141,66 +81,12 @@ pub struct PrivateKey {
 	pub bytes: Vec<u8>,
 }
 
-/// A wrapper around a vec of bytes that represent a public key.
+/// Different types of public keys are supported 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum PublicKey {
-	SSHPublicKey,
-	Crypt4GHPublicKey,
-	// ChaCha20Poly1305(GenericArray<u8, U32>),  // TODO: Newtype with the above, check ssh-key handling of envelope vs key_data()
+	SSH,
+	Crypt4GH,
 }
-
-
-// pub enum PrivateKey {
-// 	SSH(ssh_key::PrivateKey),
-// 	Crypt4GH(GenericArray<u8, U32>),
-// }
-
-// impl PrivateKey {
-// 	pub fn read_from(string: String) -> Self {
-// 		...
-// 	}
-
-// 	pub fn write_to(self) -> String {
-// 		match self {
-// 			Self::SSH(ssh) => {
-
-// 			},
-// 			Self::Crypt4GH(crypt4gh) => {
-
-// 			}
-// 		}
-// 	}
-// }
-
-// #[derive(Debug)]
-// pub enum PublicKey {
-// 	SSH(SSHPublicKey),
-// 	Crypt4GH(GenericArray<u8, U32>),
-// }
-
-// impl PublicKey {
-// 	pub fn read_from(string: String) -> Self {
-// 		...
-// 	}
-
-// 	pub fn write_to(self) -> String {
-// 		...
-// 	}
-// }
-
-// pub struct KeyPair {
-// 	private: PrivateKey,
-// 	public: PublicKey,
-// }
-
-// impl KeyPair {
-// 	pub fn generate() -> Self {
-// 		let keypair = ...;
-// 		PrivateKey(keypair.private).to_write_file().
-// 	}
-// }
-
-
 
 impl KeyPair {
 	// /// Generate a new (random) public key.
@@ -250,43 +136,20 @@ impl KeyPair {
 }
 
 impl PublicKey {
-	// pub fn encode() ->  {
-
-	// }
-
-	/// Create a new public key from bytes.
-	pub fn from(bytes: Vec<u8>) -> Self {
-		Self { bytes }
-	}
-
-	/// Get the inner bytes.
-	pub fn into_inner(self) -> Vec<u8> {
-		self.bytes
-	}
-
-	/// Get the inner bytes as a reference.
-	pub fn get_ref(&self) -> &[u8] {
-		self.bytes.as_slice()
-	}
-
-	/// Get key length
-	pub fn len(&self) -> usize {
-		self.bytes.len()
-	}
 }
 
-impl TryFrom<&[u8]> for PublicKey {
-	type Error = crate::error::Crypt4GHError;
+// impl TryFrom<&[u8]> for PublicKey {
+// 	type Error = crate::error::Crypt4GHError;
 
-	fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-		if bytes.is_empty() {
-			Err(crate::error::Crypt4GHError::InvalidPublicKey)
-		}
-		else {
-			Ok(PublicKey { bytes: bytes.to_vec() })
-		}
-	}
-}
+// 	fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+// 		if bytes.is_empty() {
+// 			Err(crate::error::Crypt4GHError::InvalidPublicKey)
+// 		}
+// 		else {
+// 			Ok(PublicKey { bytes: bytes.to_vec() })
+// 		}
+// 	}
+// }
 
 impl PrivateKey {
 	/// Generate a new private key.

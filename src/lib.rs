@@ -188,9 +188,10 @@ fn encrypt_x25519_chacha20_poly1305(
 	let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
 
 	let keypair = CryptoKeyPair::from(server_sk);
-	let client_crypto_pubkey = CryptoPubKey::from(
-		<[u8; CryptoPubKey::BYTES]>::try_from(client_pk.bytes.as_slice()).expect("slice with incorrect length"),
-	);
+	let client_crypto_pubkey = PublicKey; // FIXME: Fix upstream PublicKey/enum conundrum
+	//CryptoPubKey::from(
+	//	<[u8; CryptoPubKey::BYTES]>::try_from(client_pk.clone()).expect("slice with incorrect length"),
+	//);
 	let server_session_keys = keypair.session_keys_from(&client_crypto_pubkey);
 	let shared_key = GenericArray::<u8, U32>::from_slice(&server_session_keys.rx.as_ref().as_slice());
 

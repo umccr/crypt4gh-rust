@@ -82,14 +82,21 @@ pub struct EncryptedHeaderPacket {
 
 /// Crypt4gh spec §3.2.3
 ///
-/// TODO: Make clear decision on how to enforce this:
-///
 /// To allow parts of the data to be encrypted with different Kdata keys, more than one of this packet type may
 /// be present. If there is more than one, the data encryption method MUST be the same for all of them to
 /// prevent problems with random access in the encrypted file.
-struct DataEncryptionPacket {
+struct DataEncryptionParametersPacket {
 	encryption_method: EncryptionMethod,
 	data_key: PrivateKey,
+}
+
+/// Crypt4gh spec §3.2.4
+///
+/// This packet contains a list of edits that should be applied to the plain-text data following decryption.
+/// 
+struct DataEditListPacket {
+	number_lengths: usize,
+	lengths: Vec<usize>
 }
 
 /// Implements all header-related operations described in crypt4gh spec §3.2 and onwards
