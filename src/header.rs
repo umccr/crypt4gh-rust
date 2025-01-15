@@ -7,7 +7,7 @@ use crate::{construct_encrypted_data_packet, CypherText, Mac, Nonce, Recipients,
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct Magic([u8; 8]);
 
 /// Structs below follow crypt4gh spec §2.2
@@ -16,7 +16,7 @@ pub struct Magic([u8; 8]);
 /// the file structure.
 ///
 /// TODO: Are those encrypted?
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct Header {
 	magic: Magic,
 	version: u32,
@@ -50,7 +50,7 @@ struct EditListPacket {
 }
 
 /// Data-bearing Header Packet data type as it can hold either depending on packet type
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 enum HeaderPacketDataType {
 	EditListPacket(Vec<u8>),
 	DataPacketEncrypted(Vec<u8>),
@@ -60,7 +60,7 @@ enum HeaderPacketDataType {
 ///
 /// Conditional settings for writer_public_key/nonce/mac depending on
 /// as described in the spec can be selected at runtime
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct HeaderPacket {
 	packet_length: u32, // packet length is the length of the entire header packet (including the packet length itself)
 	encryption_method: EncryptionMethod,

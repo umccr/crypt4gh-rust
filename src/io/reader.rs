@@ -23,7 +23,7 @@ where
 {
     pub fn decrypt(&mut self, keys: KeyPair, cyphertext: CypherText) -> Result<PlainText, Crypt4GHError> {
         let c4gh = Crypt4GhBuilder::new(keys.clone()).build(); // TODO: Take as_ref() in this new to avoid .clone()?
-        c4gh.decrypt(cyphertext, keys.private_key)
+        c4gh.decrypt(cyphertext, keys.private_key().clone())
     }
 }
 

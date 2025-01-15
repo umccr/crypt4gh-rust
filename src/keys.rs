@@ -2,7 +2,7 @@ use std::io::Read;
 
 /// Implements Crypt4GH §2.1 (Keys)
 
-use chacha20poly1305::{aead::generic_array::GenericArray, ChaCha20Poly1305, Key, KeyInit};
+use chacha20poly1305::{aead::generic_array::GenericArray, ChaCha20Poly1305, KeyInit};
 use chacha20poly1305::consts::U32;
 use crypto_kx;
 use rand::{rngs::OsRng, RngCore};
@@ -20,6 +20,10 @@ pub enum EncryptionMethod {
 	X25519Chacha20Poly305,
 	Aes256Gcm,
 }
+
+// User -> private/public -> generate -> GenerateKeyPair.02x
+// User -> private/public, public_key -> Send to them.
+
 
 /// Crypt4GH §2.1.1 Asymmetric Keys
 
@@ -138,15 +142,73 @@ pub struct PrivateKey {
 }
 
 /// A wrapper around a vec of bytes that represent a public key.
-#[derive(Debug, Clone, PartialEq, Hash, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum PublicKey {
 	SSHPublicKey,
 	Crypt4GHPublicKey,
-	ChaCha20Poly1305(GenericArray<u8, U32>),
+	// ChaCha20Poly1305(GenericArray<u8, U32>),  // TODO: Newtype with the above, check ssh-key handling of envelope vs key_data()
 }
 
+
+// pub enum PrivateKey {
+// 	SSH(ssh_key::PrivateKey),
+// 	Crypt4GH(GenericArray<u8, U32>),
+// }
+
+// impl PrivateKey {
+// 	pub fn read_from(string: String) -> Self {
+// 		...
+// 	}
+
+// 	pub fn write_to(self) -> String {
+// 		match self {
+// 			Self::SSH(ssh) => {
+
+// 			},
+// 			Self::Crypt4GH(crypt4gh) => {
+
+// 			}
+// 		}
+// 	}
+// }
+
+// #[derive(Debug)]
+// pub enum PublicKey {
+// 	SSH(SSHPublicKey),
+// 	Crypt4GH(GenericArray<u8, U32>),
+// }
+
+// impl PublicKey {
+// 	pub fn read_from(string: String) -> Self {
+// 		...
+// 	}
+
+// 	pub fn write_to(self) -> String {
+// 		...
+// 	}
+// }
+
+// pub struct KeyPair {
+// 	private: PrivateKey,
+// 	public: PublicKey,
+// }
+
+// impl KeyPair {
+// 	pub fn generate() -> Self {
+// 		let keypair = ...;
+// 		PrivateKey(keypair.private).to_write_file().
+// 	}
+// }
+
+
+
 impl KeyPair {
-	/// Generates a KeyPair from scratch using RustCrypto's crypto_kx
+	// /// Generate a new (random) public key.
+	// pub fn new_chacha20poly1305() -> Self {
+	// 	let genkey = ChaCha20Poly1305::generate_key(OsRng);
+	// 	PublicKey::ChaCha20Poly1305(genkey)
+	// }
+	/// Generates a Crypt4GH KeyPair from scratch using RustCrypto's crypto_kx
 	pub fn generate(&mut self) -> Self {
 		let keypair = crypto_kx::Keypair::generate(&mut OsRng);
 
@@ -188,10 +250,9 @@ impl KeyPair {
 }
 
 impl PublicKey {
-	/// Generate a new (random) public key.
-	pub fn new() -> Self {
-		PublicKey::ChaCha20Poly1305(ChaCha20Poly1305::generate_key(OsRng).bytes())
-	}
+	// pub fn encode() ->  {
+
+	// }
 
 	/// Create a new public key from bytes.
 	pub fn from(bytes: Vec<u8>) -> Self {

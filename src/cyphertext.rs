@@ -23,7 +23,7 @@ impl CypherText {
 
 	pub fn decrypt(self, keys: KeyPair) -> Result<PlainText, Crypt4GHError> {
 		let cg4h = Crypt4GhBuilder::new(keys.clone()).build();
-		let plaintext = cg4h.decrypt(self, keys.private_key)?;
+		let plaintext = cg4h.decrypt(self, keys.private_key().clone())?;
 		Ok(plaintext)
 	}
 
