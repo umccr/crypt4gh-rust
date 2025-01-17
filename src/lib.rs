@@ -14,7 +14,7 @@ use chacha20poly1305::consts::U32;
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
 use cyphertext::CypherText;
-use header::HeaderPacketType;
+use header::{EncryptedPacketData, Header};
 use keys::{DataKeys, DataKey, EncryptionMethod, PrivateKey, SharedKeys};
 use plaintext::PlainText;
 use rand::rngs::OsRng;
@@ -61,8 +61,17 @@ pub struct Crypt4GhBuilder {
 }
 
 impl<'a> Crypt4Gh {
-	pub fn encrypt(&self, plaintext: PlainText, _recipients: Recipients) -> Result<CypherText, Crypt4GHError> {
+	// TODO: Recipients should be Some()
+	pub fn encrypt(&self, plaintext: PlainText, keys: KeyPair, recipients: Recipients) -> Result<CypherText, Crypt4GHError> {
+		if recipients.is_empty() {
+			return Err(Crypt4GHError::NoRecipients);
+		}
+
+		let seed = Seed::;
+		let shared_keys = SharedKeys::derive(keys);
+
 		// Create the crypt4gh header.
+		let header = Header::encrypt(recipients, shared_keys, seed)?;
 
 		let data_key = DataKey::generate();
 		let mut cyphertext = CypherText::new();
@@ -172,13 +181,13 @@ pub fn compute_encrypted_header(packet: &[u8], keys: &HashSet<KeyPair>) -> Resul
 }
 
 /// Constructs an encrypted data packet with the given encryption method and session keys
-fn construct_encrypted_data_packet(encryption_method: EncryptionMethod, session_keys: Option<SharedKeys>) -> Vec<u8> {
-	vec![
-		bincode::serialize(&HeaderPacketType::DataEnc).expect("Unable to serialize packet type"),
-		(encryption_method as u32).to_le_bytes().to_vec(),
-		session_keys.unwrap().to_bytes(),
-	]
-	.concat()
+fn construct_encrypted_data_packet(encryption_method: EncryptionMethod, shared_keys: Option<SharedKeys>) -> Result<EncryptedPacketData, Crypt4GHError> {
+	// vec![
+	// 	bincode::serialize(&HeaderPacketType::DataEnc).expect("Unable to serialize packet type"),
+	// 	(encryption_method as u32).to_le_bytes().to_vec(),
+	// 	shared_keys.unwrap().to_bytes(),
+	// ]
+	//.concat()
 }
 
 fn encrypt_x25519_chacha20_poly1305(

@@ -60,6 +60,7 @@ impl SharedKeys {
     }
 }
 
+#[derive(Debug)]
 pub struct DataKey {
 	inner: [u8; DATA_KEY_LENGTH]
 }

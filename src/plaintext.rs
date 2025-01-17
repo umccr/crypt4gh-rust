@@ -35,8 +35,8 @@ impl PlainText {
 		keys: KeyPair,
 	) -> Result<CypherText, Crypt4GHError> {
 		// FIXME: Revisit builder and/or this function to adjust .with_range() bounds... 0 is incorrect
-		let cg4h = Crypt4GhBuilder::new(keys).with_range(0..plaintext.length()).build();
-		let cyphertext = cg4h.encrypt(plaintext, recipients)?;
+		let cg4h = Crypt4GhBuilder::new(keys.clone()).with_range(0..plaintext.length()).build();
+		let cyphertext = cg4h.encrypt(plaintext, keys, recipients)?;
 		Ok(cyphertext)
 	}
 
