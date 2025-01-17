@@ -1,7 +1,7 @@
 use crate::error::Crypt4GHError;
 use crate::keys::KeyPair;
 use crate::plaintext::PlainText;
-use crate::Crypt4GhBuilder;
+use crate::{Crypt4GhBuilder, Segment};
 
 pub struct Reader<R> {
 	inner: R,
@@ -9,16 +9,12 @@ pub struct Reader<R> {
 
 #[derive(Debug)]
 pub struct CypherText {
-	inner: Vec<u8>,
+	segments: Vec<Segment>,
 }
 
 impl CypherText {
 	pub fn new() -> Self {
-		CypherText { inner: Vec::new() }
-	}
-
-	pub fn from(vec: Vec<u8>) -> Self {
-		CypherText { inner: vec }
+		CypherText { segments: Vec::new() }
 	}
 
 	pub fn decrypt(self, keys: KeyPair) -> Result<PlainText, Crypt4GHError> {
@@ -27,7 +23,7 @@ impl CypherText {
 		Ok(plaintext)
 	}
 
-	pub fn append_segment(&mut self, segment: &[u8]) {
-		self.inner.extend_from_slice(segment);
+	pub fn append_segment(&mut self, segment: Segment) {
+		self.segments.push(segment);
 	}
 }

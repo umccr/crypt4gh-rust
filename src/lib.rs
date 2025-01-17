@@ -9,13 +9,13 @@ use std::collections::HashSet;
 use std::ops::RangeBounds;
 
 use chacha20poly1305::aead::generic_array::GenericArray;
-use chacha20poly1305::aead::Aead;
+use chacha20poly1305::aead::{Aead, AeadMutInPlace};
 use chacha20poly1305::consts::U32;
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
 use cyphertext::CypherText;
 use header::HeaderPacketType;
-use keys::{DataKeys, EncryptionMethod, PrivateKey, SharedKeys};
+use keys::{DataKeys, DataKey, EncryptionMethod, PrivateKey, SharedKeys};
 use plaintext::PlainText;
 use rand::rngs::OsRng;
 use rand::{Rng, RngCore};
@@ -24,13 +24,27 @@ use serde::Serialize;
 use crate::error::Crypt4GHError;
 use crate::keys::{KeyPair, PublicKey};
 
+pub const MAC_LENGTH: usize = 16;
+pub const NONCE_LENGTH: usize = 12; 
+
 /// Crypt4gh spec §3.4.2
 pub const PLAINTEXT_SEGMENT_SIZE: usize = 65535;
-pub struct Segment { // FIXME: Spec pseudo-code states "select(encryption_method)" within struct
-					 // how should this be implemented?
+
+#[derive(Debug)]
+pub struct Segment {
 	nonce: Nonce,
 	encrypted_data: CypherText,
 	mac: Mac,
+}
+
+impl Segment {
+	pub fn new(nonce: Nonce, encrypted_data: CypherText, mac: Mac) -> Self {
+		Segment {
+			nonce,
+			encrypted_data,
+			mac,
+		}
+	}
 }
 
 #[derive(Clone)]
@@ -47,19 +61,18 @@ pub struct Crypt4GhBuilder {
 }
 
 impl<'a> Crypt4Gh {
-	pub fn encrypt(&self, plaintext: PlainText, recipients: Recipients) -> Result<CypherText, Crypt4GHError> {
-		// let session_keys = SessionKeys::new();
-		let data_keys = DataKeys::new();
-		// let mut rnd = ChaCha20Rng::from_seed(self.seed.inner);
-		// let mut cursor: usize = 0; // TODO: Use std::io::Cursor?
+	pub fn encrypt(&self, plaintext: PlainText, _recipients: Recipients) -> Result<CypherText, Crypt4GHError> {
+		// Create the crypt4gh header.
+
+		let data_key = DataKey::generate();
 		let mut cyphertext = CypherText::new();
 		let nonce = Nonce::new(); // FIXME: Careful, nonce should be re-calculated for each header packet
 										 // unclear if the original implementation did that?
 
 		// Encrypt segments
 		for segment in plaintext.chunks(PLAINTEXT_SEGMENT_SIZE) {
-			let encrypted_segment = Crypt4GhBuilder::encrypt_segment(segment, &nonce, &data_keys);
-			cyphertext.append_segment(encrypted_segment?.as_slice());
+			let encrypted_segment = Crypt4GhBuilder::encrypt_segment(segment, &nonce, &data_key)?;
+			cyphertext.append_segment(encrypted_segment);
 		}
 
 		Ok(cyphertext)
@@ -108,20 +121,29 @@ impl Crypt4GhBuilder {
 
 	/// Encrypts a segment with the header's Data Key.
 	///
-	/// Returns [ nonce + `encrypted_data` ].
+	/// Returns [ nonce + `encrypted_data` + mac].
 	/// 
-	// TODO: Multiple (data) keys now, so adapt accordingly
-	pub fn encrypt_segment(data: &[u8], nonce: &Nonce, keys: &DataKeys) -> Result<Vec<u8>, Crypt4GHError> {
+	pub fn encrypt_segment(data: &[u8], nonce: &Nonce, key: &DataKey) -> Result<Segment, Crypt4GHError> {
 		// Convert Crypt4GH to RustCrypto primitives/cipher
-		let key_array = GenericArray::clone_from_slice(&keys.to_bytes());
-		let cipher = ChaCha20Poly1305::new(&key_array);
+		let key_array = GenericArray::clone_from_slice(key.as_slice());
+		let mut cipher = ChaCha20Poly1305::new(&key_array);
 
 		// Same for Nonce
-		let nonce_array = GenericArray::from_slice(&nonce.inner);
-		let ciphertext = cipher.encrypt(nonce_array, data).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
+		let nonce = GenericArray::from_slice(&nonce.inner);
 
+		// Detached == return the MAC as a separate "Tag" entity?
+		let mut buffer = Vec::with_capacity(data.len());
+        buffer.extend_from_slice(data);
 
-		Ok([nonce_array.as_slice(), &ciphertext].concat())
+		let mac = cipher.encrypt_in_place_detached(&nonce, &[], &mut buffer).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
+		let ciphertext = CypherText::from(buffer);
+
+		let nonce = Nonce::from(nonce.to_vec());
+		let mac = Mac::from(mac.to_vec());
+
+		let segment = Segment::new(nonce, ciphertext, mac);
+
+		Ok(segment)
 	}
 
 	pub fn add_recipient(mut self, recipient: PublicKey) -> Self {
@@ -169,33 +191,13 @@ fn encrypt_x25519_chacha20_poly1305(
 	let client_pk =
 		PublicKey::try_from(recipients.public_keys[0].clone()).map_err(|_| Crypt4GHError::BadServerPublicKey)?;
 
-	let pubkey = server_sk.public_key();
+	let server_pk = server_sk.public_key();
 
-	// log::debug!("   packed data({}): {:02x?}", data.len(), data);
-	// log::debug!("   public key({}): {:02x?}", pubkey.as_ref().len(), pubkey.as_ref());
-	// log::debug!(
-	// 	"   private key({}): {:02x?}",
-	// 	seckey[0..32].len(),
-	// 	&seckey[0..32]
-	// );
-	// log::debug!(
-	// 	"   recipient public key({}): {:02x?}",
-	// 	recipient_pubkey.len(),
-	// 	recipient_pubkey
-	// );
-
-	// TODO: Make sure this doesn't exceed 2^32 executions, otherwise implement a counter and/or other countermeasures against repeats
 	let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
 
 	let keypair = CryptoKeyPair::from(server_sk);
-	let client_crypto_pubkey = PublicKey; // FIXME: Fix upstream PublicKey/enum conundrum
-	//CryptoPubKey::from(
-	//	<[u8; CryptoPubKey::BYTES]>::try_from(client_pk.clone()).expect("slice with incorrect length"),
-	//);
-	let server_session_keys = keypair.session_keys_from(&client_crypto_pubkey);
+	let server_session_keys = keypair.session_keys_from(&client_pk);
 	let shared_key = GenericArray::<u8, U32>::from_slice(&server_session_keys.rx.as_ref().as_slice());
-
-	// log::debug!("   shared key: {:02x?}", shared_key.to_vec());
 
 	let cipher = ChaCha20Poly1305::new(shared_key);
 
@@ -203,14 +205,13 @@ fn encrypt_x25519_chacha20_poly1305(
 		.encrypt(&nonce, data)
 		.map_err(|err| Crypt4GHError::UnableToEncryptPacket(err.to_string()))?;
 
-	Ok(vec![pubkey.as_ref(), nonce.as_slice(), ciphertext.as_slice()].concat())
+	Ok(vec![server_pk.as_ref(), nonce.as_slice(), ciphertext.as_slice()].concat())
 }
 
 /// Multiple recipients and their public keys
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Recipients {
 	pub public_keys: Vec<PublicKey>,
-	//pub private_keys: Option<Vec<PrivateKey>>
 }
 
 impl Recipients {
@@ -234,12 +235,12 @@ pub struct Seed {
 
 #[derive(Debug, Serialize)]
 pub struct Nonce {
-	pub inner: [u8; 12],
+	pub inner: [u8; NONCE_LENGTH],
 }
 
 #[derive(Debug, Serialize)]
 pub struct Mac {
-	pub inner: [u8; 16],
+	pub inner: [u8; MAC_LENGTH],
 }
 
 impl Nonce {
@@ -247,9 +248,25 @@ impl Nonce {
 		// TODO: Use this instead?
 		//let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
 
-		let mut nonce = [0u8; 12];
+		let mut nonce = [0u8; NONCE_LENGTH];
 		OsRng.fill_bytes(&mut nonce);
 		Nonce { inner: nonce }
 	}
 }
 
+
+impl From<Vec<u8>> for Nonce {
+	fn from(bytes: Vec<u8>) -> Self {
+		let mut inner = [0u8; NONCE_LENGTH];
+		inner.copy_from_slice(&bytes[..NONCE_LENGTH]);
+		Nonce { inner }
+	}
+}
+
+impl From<Vec<u8>> for Mac {
+	fn from(bytes: Vec<u8>) -> Self {
+		let mut inner = [0u8; MAC_LENGTH];
+		inner.copy_from_slice(&bytes[..MAC_LENGTH]);
+		Mac { inner }
+	}
+}

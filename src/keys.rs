@@ -2,14 +2,20 @@
 
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
 use crypto_kx;
-use rand::{rngs::OsRng, RngCore};
+use rand::{rngs::OsRng, RngCore, SeedableRng};
 use serde::Serialize;
 // TODO: We'll need to accomodate types such as Crypt4GHPubkey, Crypt4GHPrivkey
 use ssh_key::{public::PublicKey as SSHPublicKey, public::Ed25519PublicKey};
 
 use crate::Recipients;
 
+/// Crypt4GH §3.2
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
+
+/// Crypt4GH §3.4.1
+/// ChaCha20 is a stream cipher which maps a 256-bit key (32 bytes)
+const DATA_KEY_LENGTH: usize = 32;
+
 const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize)]
@@ -54,6 +60,30 @@ impl SharedKeys {
     }
 }
 
+pub struct DataKey {
+	inner: [u8; DATA_KEY_LENGTH]
+}
+
+impl DataKey {
+	pub fn generate() -> Self {
+		let  rng = rand_chacha::ChaCha20Rng::from_entropy();
+		let key = chacha20poly1305::ChaCha20Poly1305::generate_key(rng);
+		key.to_vec().into()
+	}
+
+	pub fn as_slice(&self) -> &[u8; DATA_KEY_LENGTH] {
+		&self.inner
+	}
+}
+
+impl From<Vec<u8>> for DataKey {
+	fn from(value: Vec<u8>) -> Self {
+		let mut inner = [0u8; DATA_KEY_LENGTH];
+		inner.copy_from_slice(&value[..DATA_KEY_LENGTH]);
+		DataKey { inner }
+	}
+}
+
 /// Data key(s), also known as K_data: Symmetric data key stored in data encryption parameters header packet.
 ///
 /// It is possible to encrypt parts of a file with different data keys, in which case each key will be 
@@ -61,7 +91,7 @@ impl SharedKeys {
 /// 
 /// Data Keys are used to encrypt the actual data payload of the file(s) or data stream(s).
 pub struct DataKeys {
-	inner: Vec<Vec<u8>>
+	inner: Vec<DataKey> 
 }
 
 impl DataKeys {
@@ -72,17 +102,17 @@ impl DataKeys {
 
 	/// Add a data key to the inner keys.
 	pub fn add_key(&mut self, key: Vec<u8>) {
-		self.inner.push(key);
+		self.inner.push(key.into());
 	}
 
 	/// Get the inner data keys.
-	pub fn inner(&self) -> &Vec<Vec<u8>> {
+	pub fn inner(&self) -> &Vec<DataKey> {
 		&self.inner
 	}
 
 	/// Convert the data keys to bytes.
 	pub fn to_bytes(&self) -> Vec<u8> {
-		self.inner.iter().flat_map(|key| key.clone()).collect()
+		self.inner.iter().flat_map(|key| key.as_slice().clone()).collect()
 	}
 
 	/// Convert the data keys to a single vector of bytes.
@@ -92,11 +122,7 @@ impl DataKeys {
 }
 
 
-/// Private keys are just bytes since it should support disparate formats, i.e: SSH and GA4GH
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
-pub struct PrivateKey {
-	pub bytes: Vec<u8>,
-}
+
 
 /// Different types of public keys are supported 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
@@ -152,9 +178,6 @@ impl KeyPair {
 	}
 }
 
-impl PublicKey {
-}
-
 // impl TryFrom<&[u8]> for PublicKey {
 // 	type Error = crate::error::Crypt4GHError;
 
@@ -167,6 +190,13 @@ impl PublicKey {
 // 		}
 // 	}
 // }
+
+/// Private keys are just bytes since it should support disparate formats, i.e: SSH and GA4GH
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+pub enum PrivateKey {
+	SSH,
+	Crypt4GH,
+}
 
 impl PrivateKey {
 	/// Generate a new private key.

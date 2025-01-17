@@ -72,6 +72,8 @@ pub struct HeaderPacket {
 }
 
 /// Crypt4gh spec §3.2.2
+/// 
+/// Header packet encrypted payload
 #[derive(Debug)]
 pub struct EncryptedHeaderPacket {
 	packet_type: HeaderPacketType,
