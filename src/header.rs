@@ -10,13 +10,13 @@ const VERSION: u32 = 1;
 #[derive(Debug)]
 pub struct Magic([u8; 8]);
 
-/// Structs below follow crypt4gh spec §2.2
-/// 
+/// Structs below follow crypt4gh spec §2.2 - File Structure
+///
 /// Since this file implements header-related functionality, "Header" has been removed from the name
 /// of the entity for simplicity (as opposed to the spec naming).
 ///
-/// Header precedes data blocks and is described in crypt4gh spec §3.2 and §2.2 for a high level graphical representation of
-/// the file structure.
+/// Header precedes data blocks and is described in crypt4gh spec §3.2 and §2.2 for a high level graphical
+/// representation of the file structure.
 #[derive(Debug)]
 pub struct Header {
 	magic: Magic,
@@ -25,28 +25,36 @@ pub struct Header {
 	packets: Vec<Packet>,
 }
 
-/// Crypt4gh spec §3.2.1
+/// Crypt4gh spec §3.2.1 - Header Packets
+/// (...)
+/// Crypt4gh spec §3.3.1 - X25519 ChaCha20 IETF Poly1305 encryption
+/// (...)
+/// Finally, the packet length, encryption type, writer’s public key Kpw, the nonce N and the
+/// encrypted header packet data are combined to make the header packet.
 ///
-/// Conditional settings for writer_public_key/nonce/mac depending on
-/// as described in the spec can be selected at runtime
+/// For extra security, writers MAY choose to discard the writer’s secret key K_sw after use.
+/// Due to the symmetry of the Diffie-Hellman algorithm, the holder of either secret key can
+/// regenerate the shared key as long as the other public key is known. Deleting the writer’s key
+/// K_sw ensures only the holder of the reader’s secret key K_sr can decode the header packet.
+/// As long as the writer uses randomly-generated keys, it also makes accidental nonce reuse very unlikely.
 #[derive(Debug)]
 pub struct Packet {
 	length: u32, // Packet length is the length of the entire header packet (including the packet length itself).
-				 // To prevent packet types from being guessed by looking at the size, it is permitted for the 
+				 // To prevent packet types from being guessed by looking at the size, it is permitted for the
 				 // packet length to be longer than strictly needed to encode all of the packet data.
-				 // Any remaining space after the actual data should be padded in a suitable manner 
+				 // Any remaining space after the actual data should be padded in a suitable manner
 				 // (for example by setting it to zero) and encrypted.
 	encryption_method: EncryptionMethod,
-	writer_public_key: PublicKey, // writer_public_key (Kpw) and nonce are parameters needed to decrypt 
+	writer_public_key: PublicKey, // writer_public_key (Kpw) and nonce are parameters needed to decrypt
 								  // the encrypted payload in the packet.
 	nonce: Nonce,
 	encrypted_payload: Vec<u8>, // encrypted payload is the encrypted part of the header packet, the plaintext part is
-								// described in §3.2.2 
+								// described in §3.2.2
 	mac: Mac,
 }
 
-/// Crypt4gh spec §3.2.2
-/// 
+/// Crypt4gh spec §3.2.2 - Header packet encrypted payload
+///
 /// Data-bearing Header Packet data type as it can hold either depending on packet type
 #[derive(Debug)]
 enum PacketType {
@@ -54,14 +62,13 @@ enum PacketType {
 	EditListPacket(Vec<u8>),
 }
 
-/// Header packet encrypted payload
 #[derive(Debug)]
 pub enum EncryptedPacketData {
 	DataEncryptionParameters(DataEncryptionParametersPacket),
 	DataEditList(DataEditListPacket),
 }
 
-/// Crypt4gh spec §3.2.3
+/// Crypt4gh spec §3.2.3 - Data encryption parameters packet
 ///
 /// To allow parts of the data to be encrypted with different K_data keys, more than one of this packet type may
 /// be present. If there is more than one, the data encryption method MUST be the same for all of them to
@@ -81,10 +88,10 @@ impl DataEncryptionParametersPacket {
 	}
 }
 
-/// Crypt4gh spec §3.2.4
+/// Crypt4gh spec §3.2.4 - Data edit list packet
 ///
 /// This packet contains a list of edits that should be applied to the plain-text data following decryption.
-/// 
+///
 /// It is not permitted to have more than one edit list. If more than one edit list is present, the file SHOULD
 /// be rejected.
 #[derive(Debug)]
@@ -93,9 +100,18 @@ struct DataEditListPacket {
 	lengths: Vec<u64>,		// An array of byte counts.
 }
 
-/// Implements all header-related operations described in crypt4gh spec §3.2 and onwards
+/// Implements all header-related operations described in Crypt4gh spec §3.3 - Header packet encryption
 impl Header {
-	/// Encrypt just the header
+	/// Crypt4gh spec §3.3.1 - X25519 ChaCha20 IETF Poly1305 Encryption
+	///
+	/// This method uses Elliptic Curve Diffie-Hellman key exchange with additional hashing to generate
+	/// a shared key (K_shared). K_shared is then used along with a randomly-generated nonce to encrypt
+	/// the header packet data using the ChaCha20-IETF-Poly1305 construction. The elliptic curve algorithm
+	/// used is X25519, described in section 5 of [RFC7748].
+	/// (...)
+	/// The header packet type, data and any padding is then encrypted using the method described in the
+	/// chacha20 ietf poly1305 Encryption section 3.4.1. Note that header packets are not segmented; they are
+	/// always encrypted in a single block.
 	pub fn encrypt(
 		recipients: Recipients,
 		data_key: DataKey,

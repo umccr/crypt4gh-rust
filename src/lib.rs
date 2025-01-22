@@ -29,6 +29,14 @@ pub const NONCE_LENGTH: usize = 12;
 /// Crypt4gh spec §3.4.2
 pub const PLAINTEXT_SEGMENT_SIZE: usize = 65535;
 
+/// Crypt4gh spec §3.4.2 - Segmenting the input
+///
+/// To allow random access without having to authenticate the entire file, the plain-text is divided into 65536-byte (64KiB) segments.
+/// If the plain-text is not a multiple of 64KiB long, the last segment will be shorter. Each segment is encrypted
+/// using the method defined in the header. The nonce used to encrypt the segment is then stored, followed by the encrypted data, and then the MAC.
+///
+/// The addition of the nonce and mac bytes will expand the data slightly. For chacha20 ietf poly1305, this expansion will be 28 bytes,
+/// so a 65536 byte plain-text input will become a 65564 byte encrypted and authenticated cipher-text output.
 #[derive(Debug)]
 pub struct Segment {
 	nonce: Nonce,
@@ -84,6 +92,11 @@ pub struct Seed {
 	pub inner: [u8; 32],
 }
 
+/// Crypt4gh spec §3.3.1 - X25519 ChaCha20 IETF Poly1305 Encryption
+///
+/// (...) The nonce is a unique initialisation vector. In ChaCha20-IETF-Poly1305 it is 12 bytes long.
+/// This value MUST be unique for each packet encrypted with the same reader’s and writer’s keys.
+/// The best way to ensure this is to generate a value with a cryptographically-secure random number generator.
 #[derive(Debug, Serialize)]
 pub struct Nonce {
 	pub inner: [u8; NONCE_LENGTH],
@@ -193,7 +206,7 @@ impl Crypt4GhBuilder {
 	/// Encrypts a segment with the header's Data Key.
 	///
 	/// Returns [ nonce + `encrypted_data` + mac].
-	/// 
+	///
 	pub fn encrypt_segment(data: &[u8], nonce: &Nonce, key: &DataKey) -> Result<Segment, Crypt4GHError> {
 		// Convert Crypt4GH to RustCrypto primitives/cipher
 		let key_array = GenericArray::clone_from_slice(key.as_slice());
