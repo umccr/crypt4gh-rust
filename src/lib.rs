@@ -5,7 +5,6 @@ pub mod keys;
 pub mod plaintext;
 pub mod io;
 
-use std::collections::HashSet;
 use std::ops::RangeBounds;
 
 use chacha20poly1305::aead::generic_array::GenericArray;
@@ -14,8 +13,8 @@ use chacha20poly1305::consts::U32;
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
 use cyphertext::CypherText;
-use header::{EncryptedPacketData, Header};
-use keys::{DataKeys, DataKey, EncryptionMethod, PrivateKey, SharedKeys};
+use header::Header;
+use keys::{DataKey, PrivateKey, SharedKeys};
 use plaintext::PlainText;
 use rand::rngs::OsRng;
 use rand::{Rng, RngCore};
@@ -60,6 +59,70 @@ pub struct Crypt4GhBuilder {
 	seed: Option<Seed>,
 }
 
+/// Multiple recipients and their public keys
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Recipients {
+	pub public_keys: Vec<PublicKey>,
+}
+
+impl Recipients {
+	pub fn from(public_keys: Vec<PublicKey>) -> Self {
+		Recipients { public_keys }
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self.public_keys.is_empty()
+	}
+
+	pub fn add(&mut self, public_key: PublicKey) {
+		self.public_keys.push(public_key);
+	}
+}
+
+#[derive(Clone)]
+pub struct Seed {
+	pub inner: [u8; 32],
+}
+
+#[derive(Debug, Serialize)]
+pub struct Nonce {
+	pub inner: [u8; NONCE_LENGTH],
+}
+
+#[derive(Debug, Serialize)]
+pub struct Mac {
+	pub inner: [u8; MAC_LENGTH],
+}
+
+impl Nonce {
+	pub fn new() -> Self {
+		// TODO: Use this instead?
+		//let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
+
+		let mut nonce = [0u8; NONCE_LENGTH];
+		OsRng.fill_bytes(&mut nonce);
+		Nonce { inner: nonce }
+	}
+}
+
+
+impl From<Vec<u8>> for Nonce {
+	fn from(bytes: Vec<u8>) -> Self {
+		let mut inner = [0u8; NONCE_LENGTH];
+		inner.copy_from_slice(&bytes[..NONCE_LENGTH]);
+		Nonce { inner }
+	}
+}
+
+impl From<Vec<u8>> for Mac {
+	fn from(bytes: Vec<u8>) -> Self {
+		let mut inner = [0u8; MAC_LENGTH];
+		inner.copy_from_slice(&bytes[..MAC_LENGTH]);
+		Mac { inner }
+	}
+}
+
+
 impl<'a> Crypt4Gh {
 	// TODO: Recipients should be Some()
 	pub fn encrypt(&self, plaintext: PlainText, keys: KeyPair, recipients: Recipients) -> Result<CypherText, Crypt4GHError> {
@@ -67,11 +130,10 @@ impl<'a> Crypt4Gh {
 			return Err(Crypt4GHError::NoRecipients);
 		}
 
-		let seed = Seed::;
 		let shared_keys = SharedKeys::derive(keys);
 
 		// Create the crypt4gh header.
-		let header = Header::encrypt(recipients, shared_keys, seed)?;
+		let header = Header::encrypt(recipients, shared_keys)?;
 
 		let data_key = DataKey::generate();
 		let mut cyphertext = CypherText::new();
@@ -161,35 +223,6 @@ impl Crypt4GhBuilder {
 	}
 }
 
-/// Computes the encrypted header part for each key in the given collection
-///
-/// Given a set of keys and a vector of bytes representing a packet, this function iterates over the keys and encrypts the packet using the x25519_chacha20_poly1305 encryption method.
-/// It returns a vector of encrypted segments, where each segment represents the encrypted packet for a specific key.
-///
-/// * `packet` - A vector of bytes representing the packet to be encrypted
-/// * `keys` - A collection of keypairs with `key.method` equal to 0
-pub fn compute_encrypted_header(packet: &[u8], keys: &HashSet<KeyPair>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
-	keys.iter()
-		.filter(|key| key.method == EncryptionMethod::X25519Chacha20Poly305)
-		.map(
-			|key| match encrypt_x25519_chacha20_poly1305(packet, key.private_key.clone(), key.public_keys.clone()) {
-				Ok(session_key) => Ok(vec![u32::from(key.method as u32).to_le_bytes().to_vec(), session_key].concat()),
-				Err(e) => Err(e),
-			},
-		)
-		.collect()
-}
-
-/// Constructs an encrypted data packet with the given encryption method and session keys
-fn construct_encrypted_data_packet(encryption_method: EncryptionMethod, shared_keys: Option<SharedKeys>) -> Result<EncryptedPacketData, Crypt4GHError> {
-	// vec![
-	// 	bincode::serialize(&HeaderPacketType::DataEnc).expect("Unable to serialize packet type"),
-	// 	(encryption_method as u32).to_le_bytes().to_vec(),
-	// 	shared_keys.unwrap().to_bytes(),
-	// ]
-	//.concat()
-}
-
 fn encrypt_x25519_chacha20_poly1305(
 	data: &[u8],
 	private_key: PrivateKey,
@@ -217,65 +250,3 @@ fn encrypt_x25519_chacha20_poly1305(
 	Ok(vec![server_pk.as_ref(), nonce.as_slice(), ciphertext.as_slice()].concat())
 }
 
-/// Multiple recipients and their public keys
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Recipients {
-	pub public_keys: Vec<PublicKey>,
-}
-
-impl Recipients {
-	pub fn from(public_keys: Vec<PublicKey>) -> Self {
-		Recipients { public_keys }
-	}
-
-	pub fn is_empty(&self) -> bool {
-		self.public_keys.is_empty()
-	}
-
-	pub fn add(&mut self, public_key: PublicKey) {
-		self.public_keys.push(public_key);
-	}
-}
-
-#[derive(Clone)]
-pub struct Seed {
-	pub inner: [u8; 32],
-}
-
-#[derive(Debug, Serialize)]
-pub struct Nonce {
-	pub inner: [u8; NONCE_LENGTH],
-}
-
-#[derive(Debug, Serialize)]
-pub struct Mac {
-	pub inner: [u8; MAC_LENGTH],
-}
-
-impl Nonce {
-	pub fn new() -> Self {
-		// TODO: Use this instead?
-		//let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
-
-		let mut nonce = [0u8; NONCE_LENGTH];
-		OsRng.fill_bytes(&mut nonce);
-		Nonce { inner: nonce }
-	}
-}
-
-
-impl From<Vec<u8>> for Nonce {
-	fn from(bytes: Vec<u8>) -> Self {
-		let mut inner = [0u8; NONCE_LENGTH];
-		inner.copy_from_slice(&bytes[..NONCE_LENGTH]);
-		Nonce { inner }
-	}
-}
-
-impl From<Vec<u8>> for Mac {
-	fn from(bytes: Vec<u8>) -> Self {
-		let mut inner = [0u8; MAC_LENGTH];
-		inner.copy_from_slice(&bytes[..MAC_LENGTH]);
-		Mac { inner }
-	}
-}

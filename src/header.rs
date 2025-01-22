@@ -1,8 +1,10 @@
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::error::Crypt4GHError;
-use crate::keys::{DataKey, EncryptionMethod, PublicKey, SharedKeys};
-use crate::{construct_encrypted_data_packet, CypherText, Mac, Nonce, Recipients, Seed};
+use crate::keys::{DataKey, EncryptionMethod, KeyPair, PublicKey, SharedKeys};
+use crate::{construct_encrypted_data_packet, encrypt_x25519_chacha20_poly1305, CypherText, Mac, Nonce, Recipients, Seed};
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -107,18 +109,23 @@ impl Header {
 		data_key: DataKey,
 	) -> Result<CypherText, Crypt4GHError> {
 
-		// Encrypt this
-		let header_packet = EncryptedPacketData::DataEncryptionParameters(DataEncryptionParametersPacket::new(EncryptionMethod::X25519Chacha20Poly305, data_key));
+		// Build header packet
+		let header_packet = EncryptedPacketData::DataEncryptionParameters(
+			DataEncryptionParametersPacket::new(EncryptionMethod::X25519Chacha20Poly305, data_key)
+		);
 
-		
+		// Encrypt it
+		let encrypted_header_packet  = encrypt_packet(header_packet, );
 
 		// Invariant: Starts at position 0, so no >0 range offsets are needed for header itself and this function?
 		// let header_content = construct_encrypted_data_packet(EncryptionMethod::X25519Chacha20Poly305, shared_keys);
+		// Packs HeaderPacketType::DataEnc twice with different representations?
+
 		// let header_packets = crate::Crypt4Gh::encrypt(&header_content, recipients, None)?;
 		// let header_bytes = serialize_header_packets(header_packets);
 
 		// Ok(CypherText::from(header_bytes))
-		todo!()
+		Ok(encrypted_header_packet)
 	}
 
 	/// Get the header packet bytes
@@ -135,21 +142,40 @@ impl Header {
 	pub fn into_inner(self) -> (Vec<Packet>, u64) {
 		unimplemented!()
 	}
+
+	/// Computes the encrypted header part for each key in the given collection
+	///
+	/// Given a set of keys and a vector of bytes representing a packet, this function iterates over the keys and encrypts the packet using the x25519_chacha20_poly1305 encryption method.
+	/// It returns a vector of encrypted segments, where each segment represents the encrypted packet for a specific key.
+	///
+	/// * `packet` - A vector of bytes representing the packet to be encrypted
+	/// * `keys` - A collection of keypairs with `key.method` equal to 0
+	fn encrypt_packet(packet: EncryptedPacketData, keypairs: &HashSet<KeyPair>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
+		keys.iter()
+			.filter(|key| key.method == EncryptionMethod::X25519Chacha20Poly305)
+			.map(
+				|key| match encrypt_x25519_chacha20_poly1305(packet, key.private_key.clone(), key.public_keys.clone()) {
+					Ok(session_key) => Ok(vec![u32::from(key.method as u32).to_le_bytes().to_vec(), session_key].concat()),
+					Err(e) => Err(e),
+				},
+			)
+			.collect()
+	}
 }
 
-/// Serializes the header packets.
-///
-/// Returns [ Magic "crypt4gh" + version + packet count + header packets... ] serialized.
-pub fn serialize_header_packets(packets: Vec<Vec<u8>>) -> Vec<u8> {
-	// log::info!("Serializing the header packets ({} packets)", packets.len());
-	vec![
-		MAGIC_NUMBER.to_vec(),
-		(VERSION as u32).to_le_bytes().to_vec(),
-		(packets.len() as u32).to_le_bytes().to_vec(),
-		packets
-			.into_iter()
-			.flat_map(|packet| vec![((packet.len() + 4) as u32).to_le_bytes().to_vec(), packet].concat())
-			.collect::<Vec<u8>>(),
-	]
-	.concat()
-}
+// /// Serializes the header packets.
+// ///
+// /// Returns [ Magic "crypt4gh" + version + packet count + header packets... ] serialized.
+// pub fn serialize_header_packets(packets: Vec<Vec<u8>>) -> Vec<u8> {
+// 	// log::info!("Serializing the header packets ({} packets)", packets.len());
+// 	vec![
+// 		MAGIC_NUMBER.to_vec(),
+// 		(VERSION as u32).to_le_bytes().to_vec(),
+// 		(packets.len() as u32).to_le_bytes().to_vec(),
+// 		packets
+// 			.into_iter()
+// 			.flat_map(|packet| vec![((packet.len() + 4) as u32).to_le_bytes().to_vec(), packet].concat())
+// 			.collect::<Vec<u8>>(),
+// 	]
+// 	.concat()
+// }
