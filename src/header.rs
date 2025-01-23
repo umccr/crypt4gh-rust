@@ -52,24 +52,36 @@ pub struct Packet {
 	writer_public_key: PublicKey, // writer_public_key (Kpw) and nonce are parameters needed to decrypt
 								  // the encrypted payload in the packet.
 	nonce: Nonce,
-	encrypted_payload: Vec<u8>, // encrypted payload is the encrypted part of the header packet, the plaintext part is
-								// described in §3.2.2
+	encrypted_payload: EncryptedPacketData, // encrypted payload is the encrypted part of the header packet, the plaintext part is
+											// described in §3.2.2
 	mac: Mac,
 }
 
-/// Crypt4gh spec §3.2.2 - Header packet encrypted payload
+/// Crypt4gh spec §2.3 - Header Packet Types
 ///
-/// Data-bearing Header Packet data type as it can hold either depending on packet type
+/// There are two types of header packet:
 #[derive(Debug)]
 enum PacketType {
-	DataEncryptionParametersPacket(Vec<u8>),
-	EditListPacket(Vec<u8>),
-}
+	DataEncryptionParameters,	// Data encryption key packets.
+								//
+								// These describe the parameters used to encrypt one or more of the data blocks.
+								// They contain a code indicating the type of encryption, and the symmetric key (K_data)
+								// needed to decrypt the data. If parts of the data have been encrypted with different keys,
+								// more than one of this packet type will be present.
 
-#[derive(Debug)]
-pub enum EncryptedPacketData {
-	DataEncryptionParameters(DataEncryptionParametersPacket),
-	DataEditList(DataEditListPacket),
+	EditList,					// Data edit list packets.
+								//
+								// These packets allow parts of the data to be discarded after decryption. They can be used
+								// to avoid having to decrypt and re-encrypt files during splicing operations.
+								// For example, a user may want to extract the blocks corresponding to Chromosome X from a CRAM
+								// file and store them in a new file. If the start and end points of the extract do not
+								// correspond to a 64Kbyte data block boundary, they would normally have to decrypt all
+								// of the data blocks covering the region, discard a few bytes from the start and end,
+								// re-encrypt the remaining data and store it in a new file.
+								//
+								// The data edit list enables a simpler solution where the necessary encrypted data blocks are copied
+								// directly into the new file. On reading, the data blocks are decrypted and then the edit list is used to
+								// find out which parts of the unencrypted data should be discarded.
 }
 
 /// Crypt4gh spec §3.2.3 - Data encryption parameters packet
@@ -78,14 +90,16 @@ pub enum EncryptedPacketData {
 /// be present. If there is more than one, the data encryption method MUST be the same for all of them to
 /// prevent problems with random access in the encrypted file.
 #[derive(Debug)]
-struct DataEncryptionParametersPacket {
+pub struct EncryptedPacketData {
+	packet_type: PacketType,
 	encryption_method: EncryptionMethod,
 	data_key: DataKey,
 }
 
-impl DataEncryptionParametersPacket {
-	pub fn new(encryption_method: EncryptionMethod, data_key: DataKey) -> Self {
+impl EncryptedPacketData {
+	pub fn new(packet_type: PacketType, encryption_method: EncryptionMethod, data_key: DataKey) -> Self {
 		Self {
+			packet_type: packet_type,
 			encryption_method,
 			data_key,
 		}
@@ -99,7 +113,7 @@ impl DataEncryptionParametersPacket {
 /// It is not permitted to have more than one edit list. If more than one edit list is present, the file SHOULD
 /// be rejected.
 #[derive(Debug)]
-struct DataEditListPacket {
+struct EditListPacket {
 	number_lengths: usize,  // The number of items in the lengths array.
 	lengths: Vec<u64>,		// An array of byte counts.
 }
@@ -122,9 +136,9 @@ impl Header {
 	) -> Result<CypherText, Crypt4GHError> {
 
 		// Build header packet
-		let header_packet = EncryptedPacketData::DataEncryptionParameters(
-			DataEncryptionParametersPacket::new(EncryptionMethod::X25519Chacha20Poly305, data_key)
-		);
+		let header_packet = EncryptedPacketData::new(PacketType::DataEncryptionParameters,
+																		  EncryptionMethod::X25519Chacha20Poly305,
+																		  data_key);
 
 		// Encrypt it
 		let encrypted_header_packet  = encrypt_packet(header_packet, );
@@ -162,7 +176,9 @@ impl Header {
 	///
 	/// * `packet` - A vector of bytes representing the packet to be encrypted
 	/// * `keys` - A collection of keypairs with `key.method` equal to 0
-	fn encrypt_packet(packet: DataEncryptionParametersPacket, keypairs: &HashSet<KeyPair>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
+	///
+	/// TODO: keypairs type should probably be inline with section 2.4 of the spec, unsure if HashSet is the best type/data structure for this?
+	fn encrypt_packet(packet: Packet, keypairs: &HashSet<KeyPair>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
 		keypairs.iter()
 			.filter(|key| key.method == EncryptionMethod::X25519Chacha20Poly305)
 			.map(
