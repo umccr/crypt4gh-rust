@@ -23,14 +23,17 @@ use serde::Serialize;
 use crate::error::Crypt4GHError;
 use crate::keys::{KeyPair, PublicKey};
 
+/// Crypt4gh spec §3.4.1 - Chacha20 IETF Poly1305 encryption
+///
+/// (...) Poly1305 is used to generate a 16-byte message authentication code (MAC) over the cipher-text.
 pub const MAC_LENGTH: usize = 16;
+
+/// (...) In IETF mode the nonce is 96 bits long.
 pub const NONCE_LENGTH: usize = 12; 
 
-/// Crypt4gh spec §3.4.2
+/// Crypt4gh spec §3.4.2 - Segmenting the input
 pub const PLAINTEXT_SEGMENT_SIZE: usize = 65535;
 
-/// Crypt4gh spec §3.4.2 - Segmenting the input
-///
 /// To allow random access without having to authenticate the entire file, the plain-text is divided into 65536-byte (64KiB) segments.
 /// If the plain-text is not a multiple of 64KiB long, the last segment will be shorter. Each segment is encrypted
 /// using the method defined in the header. The nonce used to encrypt the segment is then stored, followed by the encrypted data, and then the MAC.
@@ -134,7 +137,6 @@ impl From<Vec<u8>> for Mac {
 		Mac { inner }
 	}
 }
-
 
 impl<'a> Crypt4Gh {
 	// TODO: Recipients should be Some()

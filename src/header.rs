@@ -10,10 +10,14 @@ const VERSION: u32 = 1;
 #[derive(Debug)]
 pub struct Magic([u8; 8]);
 
-/// Structs below follow crypt4gh spec §2.2 - File Structure
+/// Structs below follow Crypt4gh spec §2.2 - File Structure as closely as possible.
 ///
-/// Since this file implements header-related functionality, "Header" has been removed from the name
-/// of the entity for simplicity (as opposed to the spec naming).
+/// Since this file implements header-related functionality, "Header" has been removed from names
+/// of the entities (i.e HeaderPacket in the spec becomes Packet here). The only exception is
+/// the top level "Header" struct itself.
+
+
+/// Crypt4gh spec §3.2 - Header
 ///
 /// Header precedes data blocks and is described in crypt4gh spec §3.2 and §2.2 for a high level graphical
 /// representation of the file structure.
