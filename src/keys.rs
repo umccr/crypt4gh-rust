@@ -7,21 +7,34 @@ use serde::Serialize;
 // TODO: We'll need to accomodate types such as Crypt4GHPubkey, Crypt4GHPrivkey
 use ssh_key::{public::PublicKey as SSHPublicKey, public::Ed25519PublicKey};
 
-use crate::Recipients;
+use crate::{error::Crypt4GHError, Recipients};
 
 /// Crypt4GH §3.2
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
 
 /// Crypt4GH §3.4.1
 /// ChaCha20 is a stream cipher which maps a 256-bit key (32 bytes)
-const DATA_KEY_LENGTH: usize = 32;
+pub(crate) const DATA_KEY_LENGTH: usize = 32;
 
 const SSH_MAGIC_WORD: &[u8; 15] = b"openssh-key-v1\x00";
 
+// Crypt4GH §A.1
+// For symmetric encryption, the main candidates for authenticated encryption were AES-GCM and ChaCha20-
+// Poly1305. Both have good security guarantees, and thanks to their use in TLS 1.3 both have good library sup-
+// port. ChaCha20-Poly1305 was chosen because it allows much longer files to be encrypted
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize)]
 pub enum EncryptionMethod {
 	X25519Chacha20Poly305,
-	Aes256Gcm,
+//	Aes256Gcm,
+}
+
+pub const ENCRYPTION_METHOD_SIZE: usize = 4;
+
+impl EncryptionMethod {
+	/// Convert the enum to bytes.
+	pub fn to_bytes(self) -> [u8; ENCRYPTION_METHOD_SIZE] {
+		(self as u32).to_le_bytes()
+	}
 }
 
 /// Crypt4GH §2.1.1 Asymmetric Keys
@@ -67,12 +80,15 @@ pub struct DataKey {
 
 impl DataKey {
 	pub fn generate() -> Self {
-		let  rng = rand_chacha::ChaCha20Rng::from_entropy();
-		let key = chacha20poly1305::ChaCha20Poly1305::generate_key(rng);
+		let key = chacha20poly1305::ChaCha20Poly1305::generate_key(OsRng);
 		key.to_vec().into()
 	}
 
 	pub fn as_slice(&self) -> &[u8; DATA_KEY_LENGTH] {
+		&self.inner
+	}
+
+	pub fn as_bytes(&self) -> &[u8] {
 		&self.inner
 	}
 }
@@ -122,14 +138,19 @@ impl DataKeys {
 	}
 }
 
-
-
-
 /// Different types of public keys are supported 
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
-pub enum PublicKey {
-	SSH,
-	Crypt4GH,
+pub struct PublicKey {
+	inner: Vec<u8>,
+}
+
+impl PublicKey {
+	pub fn new(inner: Vec<u8>) -> Self {
+		Self { inner }
+	}
+	pub fn as_slice(&self) -> &[u8] {
+		&self.inner
+	}
 }
 
 impl KeyPair {
@@ -192,43 +213,51 @@ impl KeyPair {
 // 	}
 // }
 
+/// FIXME: Do we want to type different types of PrivateKeys or detect them further downstream?
+/// 
 /// Private keys are just bytes since it should support disparate formats, i.e: SSH and GA4GH
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
-pub enum PrivateKey {
-	SSH,
-	Crypt4GH,
+// #[derive(Debug, Clone, PartialEq, Hash, Eq)]
+// pub enum PrivateKey {
+// 	SSH,
+// 	Crypt4GH,
+// }
+
+pub struct PrivateKey {
+	inner: Vec<u8>,
 }
 
 impl PrivateKey {
 	/// Generate a new private key.
 	pub fn new() -> Self {
-		let bytes = ChaCha20Poly1305::generate_key(OsRng).to_vec();
-		PrivateKey { bytes }
+		let inner = ChaCha20Poly1305::generate_key(OsRng).to_vec();
+		PrivateKey { inner }
 	}
 
 	/// Create a new private key from bytes.
 	pub fn from(bytes: Vec<u8>) -> Self {
-		Self { bytes }
+		Self { inner: bytes }
 	}
 
 	/// Retrieve public key from private key
-	pub fn get_public_key(self) {
-		todo!()
+	pub fn get_public_key(self) -> Result<PublicKey, Crypt4GHError> {	
+		let slice: [u8; DATA_KEY_LENGTH] = self.as_slice().try_into().map_err(|_| Crypt4GHError::BadKey)?;
+		let private_key = crypto_kx::SecretKey::from(slice);
+		Ok(PublicKey::new(private_key.public_key().as_ref().to_vec()))
 	}
 
 	/// Get the inner bytes.
 	pub fn into_inner(self) -> Vec<u8> {
-		self.bytes
+		self.inner
 	}
 
 	/// Get the inner bytes as a reference.
-	pub fn get_ref(&self) -> &[u8] {
-		self.bytes.as_slice()
+	pub fn as_slice(&self) -> &[u8] {
+		&self.inner.as_slice()
 	}
 
 	/// Get key length
 	pub fn len(&self) -> usize {
-		self.bytes.len()
+		self.inner.len()
 	}
 }
 

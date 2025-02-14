@@ -73,7 +73,7 @@ pub struct Crypt4GhBuilder {
 /// Multiple recipients and their public keys
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Recipients {
-	pub public_keys: Vec<PublicKey>,
+	public_keys: Vec<PublicKey>,
 }
 
 impl Recipients {
@@ -87,6 +87,10 @@ impl Recipients {
 
 	pub fn add(&mut self, public_key: PublicKey) {
 		self.public_keys.push(public_key);
+	}
+
+	pub fn into_inner(self) -> Vec<PublicKey> {
+		self.public_keys
 	}
 }
 
