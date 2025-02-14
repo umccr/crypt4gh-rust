@@ -1,8 +1,20 @@
 use std::collections::HashSet;
 
+use std::mem;
 use crate::error::Crypt4GHError;
-use crate::keys::{DataKey, EncryptionMethod, KeyPair, PublicKey};
-use crate::{encrypt_x25519_chacha20_poly1305, CypherText, Mac, Nonce, Recipients};
+use crate::keys::{self, DataKey, EncryptionMethod, KeyPair, PublicKey, ENCRYPTION_METHOD_SIZE};
+
+use chacha20poly1305::aead::generic_array::GenericArray;
+use chacha20poly1305::aead::AeadMutInPlace;
+use chacha20poly1305::consts::U32;
+// use chacha20poly1305::{AeadCore, KeyInit, ChaCha20Poly1305, aead::rand::StdRng, aead::rand::SeedableRng};
+use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
+use chacha20poly1305::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    ChaCha20Poly1305, Nonce
+};
+
+use crate::{encrypt_x25519_chacha20_poly1305, CypherText, Mac, Recipients, MAC_LENGTH};
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -10,10 +22,10 @@ const VERSION: u32 = 1;
 #[derive(Debug)]
 pub struct Magic([u8; 8]);
 
-/// Structs below follow Crypt4gh spec §2.2 - File Structure as closely as possible.
+/// Structs below follow Crypt4gh spec §2.2 - File Structure, as closely as possible.
 ///
 /// Since this file implements header-related functionality, "Header" has been removed from names
-/// of the entities (i.e HeaderPacket in the spec becomes Packet here). The only exception is
+/// of the entities (i.e "HeaderPacket" named in the spec becomes "Packet" here). The only exception is
 /// the top level "Header" struct itself.
 
 
@@ -33,7 +45,7 @@ pub struct Header {
 /// (...)
 /// Crypt4gh spec §3.3.1 - X25519 ChaCha20 IETF Poly1305 encryption
 /// (...)
-/// Finally, the packet length, encryption type, writer’s public key Kpw, the nonce N and the
+/// Finally, the packet length, encryption type, writer’s public key K_pw, the nonce N and the
 /// encrypted header packet data are combined to make the header packet.
 ///
 /// For extra security, writers MAY choose to discard the writer’s secret key K_sw after use.
@@ -49,12 +61,32 @@ pub struct Packet {
 				 // Any remaining space after the actual data should be padded in a suitable manner
 				 // (for example by setting it to zero) and encrypted.
 	encryption_method: EncryptionMethod,
-	writer_public_key: PublicKey, // writer_public_key (Kpw) and nonce are parameters needed to decrypt
+	writer_public_key: PublicKey, // writer_public_key (K_pw) and nonce are parameters needed to decrypt
 								  // the encrypted payload in the packet.
 	nonce: Nonce,
-	encrypted_payload: EncryptedPacketData, // encrypted payload is the encrypted part of the header packet, the plaintext part is
+	encrypted_payload: Vec<u8>, // encrypted payload is the encrypted part of the header packet, the plaintext part is
 											// described in §3.2.2
 	mac: Mac,
+}
+
+impl Packet {
+	pub fn new(
+		length: u32,
+		encryption_method: EncryptionMethod,
+		writer_public_key: PublicKey,
+		nonce: Nonce,
+		encrypted_payload: Vec<u8>,
+		mac: Mac,
+	) -> Self {
+		Self {
+			length,
+			encryption_method,
+			writer_public_key,
+			nonce,
+			encrypted_payload,
+			mac,
+		}
+	}
 }
 
 /// Crypt4gh spec §2.3 - Header Packet Types
@@ -84,6 +116,13 @@ enum PacketType {
 								// find out which parts of the unencrypted data should be discarded.
 }
 
+impl PacketType {
+	/// Convert the enum to bytes.
+	pub fn to_bytes(self) -> [u8; 4] {
+		(self as u32).to_le_bytes()
+	}
+}
+
 /// Crypt4gh spec §3.2.3 - Data encryption parameters packet
 ///
 /// To allow parts of the data to be encrypted with different K_data keys, more than one of this packet type may
@@ -103,6 +142,11 @@ impl EncryptedPacketData {
 			encryption_method,
 			data_key,
 		}
+	}
+
+	/// Concat the struct fields into bytes to be encrypted.
+	pub fn to_bytes(self) -> Vec<u8> {
+		[self.packet_type.to_bytes().as_slice(), self.encryption_method.to_bytes().as_slice(), self.data_key.as_slice()].concat()
 	}
 }
 
@@ -132,16 +176,36 @@ impl Header {
 	/// always encrypted in a single block.
 	pub fn encrypt(
 		recipients: Recipients,
-		data_key: DataKey,
-	) -> Result<CypherText, Crypt4GHError> {
+		key_pair: KeyPair,
+	) -> Result<Vec<Packet>, Crypt4GHError> {
+		let mut header_packets = vec![];
 
-		// Build header packet
-		let header_packet = EncryptedPacketData::new(PacketType::DataEncryptionParameters,
-																		  EncryptionMethod::X25519Chacha20Poly305,
-																		  data_key);
+		for reader_public_key in recipients.into_inner().into_iter() {
+			// Build header packet
+			let header_packet = EncryptedPacketData::new(PacketType::DataEncryptionParameters,
+																			EncryptionMethod::X25519Chacha20Poly305,
+																			DataKey::generate()
+														);
 
-		// Encrypt it
-		let encrypted_header_packet  = encrypt_packet(header_packet, );
+			// Encrypt it
+			let header_packet_bytes = header_packet.to_bytes();
+			let (nonce, encrypted_payload, mac) = Self::encrypt_packet(header_packet_bytes, key_pair.clone(), reader_public_key)?;
+			let writer_public_key = key_pair.clone().private_key.get_public_key()?;
+
+			let length = size_of::<u32>() + ENCRYPTION_METHOD_SIZE + writer_public_key.as_slice().len() + nonce.len() + encrypted_payload.len() + MAC_LENGTH;															
+
+			let packet = Packet {
+				length: length as u32,
+				encryption_method: EncryptionMethod::X25519Chacha20Poly305,
+				writer_public_key,
+				nonce,
+				encrypted_payload,
+				mac,
+			};
+
+			header_packets.push(packet);
+		}
+		
 
 		// Invariant: Starts at position 0, so no >0 range offsets are needed for header itself and this function?
 		// let header_content = construct_encrypted_data_packet(EncryptionMethod::X25519Chacha20Poly305, shared_keys);
@@ -151,7 +215,7 @@ impl Header {
 		// let header_bytes = serialize_header_packets(header_packets);
 
 		// Ok(CypherText::from(header_bytes))
-		Ok(encrypted_header_packet)
+		Ok(header_packets)
 	}
 
 	/// Get the header packet bytes
@@ -169,25 +233,85 @@ impl Header {
 		unimplemented!()
 	}
 
-	/// Computes the encrypted header part for each key in the given collection
+	/// Crypt4gh spec §3.3.1 - X25519 ChaCha20 IETF Poly1305 Encryption
+	/// (...)
+	/// Encryption requires the writer’s public and secret keys (K_pw and K_sw), the reader’s public key (K_pr) and a nonce (N).
+	/// (...)
+	/// Crypt4GH spec §2.4 - Encoding For Multiple Public/Secret Key Pairs
+	/// 
+	/// It is sometimes useful to encrypt files so that they can be accessed using more than one secret key (K_sr).
+	/// For example, multiple members of a team may need to access to a file with their own key.
+	/// To allow this, the header packet data is encrypted using each reader’s public key (K_pr) and stored in a
+	/// separate header packet for each individual reader.
+	/// 
+	/// [^ This is implemented by our Keypair and Recipients types below ]
 	///
-	/// Given a set of keys and a vector of bytes representing a packet, this function iterates over the keys and encrypts the packet using the x25519_chacha20_poly1305 encryption method.
-	/// It returns a vector of encrypted segments, where each segment represents the encrypted packet for a specific key.
-	///
-	/// * `packet` - A vector of bytes representing the packet to be encrypted
-	/// * `keys` - A collection of keypairs with `key.method` equal to 0
-	///
-	/// TODO: keypairs type should probably be inline with section 2.4 of the spec, unsure if HashSet is the best type/data structure for this?
-	fn encrypt_packet(packet: Packet, keypairs: &HashSet<KeyPair>) -> Result<Vec<Vec<u8>>, Crypt4GHError> {
-		keypairs.iter()
-			.filter(|key| key.method == EncryptionMethod::X25519Chacha20Poly305)
-			.map(
-				|key| match encrypt_x25519_chacha20_poly1305(packet, key.private_key.clone(), key.public_keys.clone()) {
-					Ok(session_key) => Ok(vec![u32::from(key.method as u32).to_le_bytes().to_vec(), session_key].concat()),
-					Err(e) => Err(e),
-				},
-			)
-			.collect()
+	/// Where this is done, it is likely that anyone reading the file will only have the correct secret key (K_sr) for a
+	/// subset of the header packets. Attempting to decode a header packet with the wrong key will result in a failure
+	/// to verify the MAC stored in the file. When this happens, implementations should ignore the undecodable
+	/// header packet and move on to the next one. Failing to decrypt a packet in this way SHOULD NOT cause
+	/// an error to be reported; however an error MUST be raised if, on reaching the end of the header, it has not
+	/// been possible to decrypt at least one data encryption key packet.
+	fn encrypt_packet(packet: Vec<u8>, key_pair: KeyPair, reader_public_key: PublicKey) -> Result<(Nonce, Vec<u8>, Mac), Crypt4GHError> {
+		let writer_private_key: &[u8] = key_pair.private_key.as_slice();
+
+		let slice: [u8; keys::DATA_KEY_LENGTH] = writer_private_key.try_into().map_err(|_| Crypt4GHError::BadKey)?;
+		let kx_key_pair = crypto_kx::Keypair::from(crypto_kx::SecretKey::from(slice));
+
+		let slice: [u8; keys::DATA_KEY_LENGTH] = reader_public_key.as_slice().try_into().map_err(|_| Crypt4GHError::BadKey)?;
+		let kx_public_key = crypto_kx::PublicKey::from(slice);
+		
+		let key_shared = kx_key_pair.session_keys_from(&kx_public_key);
+
+		let shared_key = GenericArray::<u8, U32>::from_slice(&key_shared.rx.as_ref().as_slice());
+		let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
+		let mut encrypt = ChaCha20Poly1305::new(shared_key);
+
+		let mut buffer = Vec::with_capacity(packet.len());
+        buffer.extend_from_slice(&packet);
+		
+		let mac = encrypt.encrypt_in_place_detached(&nonce, &[], &mut buffer).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
+		let mac = Mac::from(mac.to_vec());
+
+		Ok((nonce, encrypt
+			.encrypt(&nonce, packet.as_ref())
+			.map_err(|err| Crypt4GHError::UnableToEncryptPacket(err.to_string()))?, mac))
+
+
+		// let mut encrypted_packets = vec![];
+		// for reader_public_key in recipients.into_inner().into_iter() {
+		// 	// writer_private_key
+		// 	// writer_public_key
+		// 	// reader_public_key
+
+		// 	// key_diffie = X25519(writer_private_key, reader_public_key)
+		// 	// key_shared = Blake2b(key_diffie || key_diffie || writer_public_key)
+
+		// 	let writer_private_key: &[u8] = key_pair.private_key.as_slice();
+		// 	let kx_key_pair = crypto_kx::Keypair::from(crypto_kx::SecretKey::from(writer_private_key.try_into().map_err(|err| Crypt4GHError::BadKey)?));
+		// 	let key_shared = kx_key_pair.session_keys_from(&crypto_kx::PublicKey::from(reader_public_key.as_slice().try_into().map_err(|err| Crypt4GHError::BadKey)?));
+
+
+		// 	let shared_key = GenericArray::<u8, U32>::from_slice(&key_shared.rx.as_ref().as_slice());
+		// 	let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
+		// 	let encrypt = ChaCha20Poly1305::new(shared_key);
+		// 	let ciphertext = encrypt
+		// 		.encrypt(&nonce, packet.as_ref())
+		// 		.map_err(|err| Crypt4GHError::UnableToEncryptPacket(err.to_string()))?;
+		
+		// 	encrypted_packets.push(cip);	
+		// 	Ok(vec![server_pk.as_ref(), nonce.as_slice(), ciphertext.as_slice()].concat())
+		// }
+
+		// keypairs.iter()
+		// 	.filter(|key| key.method == EncryptionMethod::X25519Chacha20Poly305)
+		// 	.map(
+		// 		|key| match encrypt_x25519_chacha20_poly1305(packet, key.private_key.clone(), key.public_keys.clone()) {
+		// 			Ok(session_key) => Ok(vec![u32::from(key.method as u32).to_le_bytes().to_vec(), session_key].concat()),
+		// 			Err(e) => Err(e),
+		// 		},
+		// 	)
+		// 	.collect()
 	}
 }
 
