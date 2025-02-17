@@ -8,22 +8,26 @@ pub struct Reader<R> {
 }
 
 #[derive(Debug)]
-pub struct CypherText {
+pub struct DataBlocks {
 	segments: Vec<Segment>,
 }
 
-impl CypherText {
+impl DataBlocks {
 	pub fn new() -> Self {
-		CypherText { segments: Vec::new() }
-	}
-
-	pub fn decrypt(self, keys: KeyPair) -> Result<PlainText, Crypt4GHError> {
-		let cg4h = Crypt4GhBuilder::new(keys.clone()).build();
-		let plaintext = cg4h.decrypt(self, keys.private_key().clone())?;
-		Ok(plaintext)
+		DataBlocks { segments: Vec::new() }
 	}
 
 	pub fn append_segment(&mut self, segment: Segment) {
 		self.segments.push(segment);
 	}
+
+	/// Convert the file to a little endian vector of bytes.
+	pub fn to_bytes(self) -> Vec<u8> {
+		let mut bytes = Vec::new();
+		for segment in self.segments {
+			bytes.extend_from_slice(&segment.to_bytes());
+		}
+		bytes
+	}
+
 }

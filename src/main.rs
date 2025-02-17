@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use crypt4gh::error::Crypt4GHError;
 use crypt4gh::keys::{EncryptionMethod, KeyPair, PrivateKey, get_brainstorm_public_key};
 use crypt4gh::plaintext::PlainText;
-use crypt4gh::{Crypt4GhBuilder, Recipients};
+use crypt4gh::{CipherText, Crypt4GhBuilder, Recipients};
+use crypt4gh::keys::PublicKey;
 
 use noodles::cram;
 use tokio::fs::File;
@@ -21,13 +22,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
 	// Pubkey 
 	// FIXME: Remove hardcoding
 	let pubkey = get_brainstorm_public_key();
+	let public_key = PublicKey::new(pubkey.as_ref().to_vec());
 
 	// Setup PKI
 	let mut pubkeys = vec![];
-	pubkeys.push(pubkey);
+	pubkeys.push(public_key);
 
 	let privkey = PrivateKey::new();
-	let keypair = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, privkey, crypt4gh::Recipients { public_keys: pubkeys.clone() });
+	let keypair = KeyPair::new(EncryptionMethod::X25519Chacha20Poly305, 
+										privkey,
+										crypt4gh::Recipients::from(pubkeys.clone()));
 
 	// Init the Crypt4GH client
 	let c4gh = Crypt4GhBuilder::new(keypair.clone()).build();
@@ -42,10 +46,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 	let plaintext = PlainText::from(cram_header);
 
 	// Encrypt and decrypt payload
-	let recipients = Recipients::from(pubkeys.clone());
+	let recipients = Recipients::from(pubkeys);
 
-	let enc = c4gh.encrypt(plaintext, recipients)?;
-	let dec = enc.decrypt(keypair)?;
+	let enc = c4gh.encrypt(plaintext, keypair.clone(), recipients)?;
+	let dec = c4gh.decrypt(CipherText::new(enc.to_bytes()), keypair.private_key)?;
 
 	dbg!(dec);
 

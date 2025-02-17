@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 
 use std::mem;
 use crate::error::Crypt4GHError;
@@ -8,13 +7,12 @@ use chacha20poly1305::aead::generic_array::GenericArray;
 use chacha20poly1305::aead::AeadMutInPlace;
 use chacha20poly1305::consts::U32;
 // use chacha20poly1305::{AeadCore, KeyInit, ChaCha20Poly1305, aead::rand::StdRng, aead::rand::SeedableRng};
-use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
 use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     ChaCha20Poly1305, Nonce
 };
 
-use crate::{encrypt_x25519_chacha20_poly1305, CypherText, Mac, Recipients, MAC_LENGTH};
+use crate::{Mac, Recipients, MAC_LENGTH};
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -28,6 +26,49 @@ pub struct Magic([u8; 8]);
 /// of the entities (i.e "HeaderPacket" named in the spec becomes "Packet" here). The only exception is
 /// the top level "Header" struct itself.
 
+// TODO: Rethink struct naming
+pub struct HeaderWithKeys {
+	header: Header,
+	data_keys: Vec<DataKey>,
+}
+
+impl HeaderWithKeys {
+	pub fn new(header: Header, data_keys: Vec<DataKey>) -> Self {
+		Self {
+			header,
+			data_keys,
+		}
+	}
+
+	// TODO: Rethink naming, this is a public API
+	pub fn from_keypair(
+		recipients: Recipients,
+		key_pair: KeyPair,
+	) -> Result<Self, Crypt4GHError> {
+		let (header, keys) = Header::from_keypair(recipients, key_pair)?;
+		Ok(Self::new(header, keys))
+	}
+
+	pub fn into_inner(self) -> (Header, Vec<DataKey>) {
+		(self.header, self.data_keys)
+	}
+
+	pub fn header(&self) -> &Header {
+		&self.header
+	}
+
+	pub fn header_mut(&mut self) -> &mut Header {
+		&mut self.header
+	}
+
+	pub fn data_keys(&self) -> &[DataKey] {
+		&self.data_keys
+	}
+
+	pub fn data_keys_mut(&mut self) -> &mut [DataKey] {
+		&mut self.data_keys
+	}
+}
 
 /// Crypt4gh spec §3.2 - Header
 ///
@@ -164,6 +205,25 @@ struct EditListPacket {
 
 /// Implements all header-related operations described in Crypt4gh spec §3.3 - Header packet encryption
 impl Header {
+	pub fn new(packets: Vec<Packet>) -> Self {
+		Self {
+			magic: Magic(*MAGIC_NUMBER),
+			version: VERSION,
+			count: packets.len() as u32,
+			packets,
+		}
+	}
+
+	// TODO: Rethink naming, this is a public API
+	pub fn from_keypair(
+		recipients: Recipients,
+		key_pair: KeyPair,
+	) -> Result<(Self, Vec<DataKey>), Crypt4GHError> {
+		let packets = Self::encrypt(recipients, key_pair)?;
+		let (packets, data_keys) = packets.into_iter().unzip();
+		Ok((Self::new(packets), data_keys))
+	}
+
 	/// Crypt4gh spec §3.3.1 - X25519 ChaCha20 IETF Poly1305 Encryption
 	///
 	/// This method uses Elliptic Curve Diffie-Hellman key exchange with additional hashing to generate
@@ -177,7 +237,7 @@ impl Header {
 	pub fn encrypt(
 		recipients: Recipients,
 		key_pair: KeyPair,
-	) -> Result<Vec<Packet>, Crypt4GHError> {
+	) -> Result<Vec<(Packet, DataKey)>, Crypt4GHError> {
 		let mut header_packets = vec![];
 
 		for reader_public_key in recipients.into_inner().into_iter() {
@@ -187,6 +247,7 @@ impl Header {
 																			DataKey::generate()
 														);
 
+			let data_key = header_packet.data_key.clone();												
 			// Encrypt it
 			let header_packet_bytes = header_packet.to_bytes();
 			let (nonce, encrypted_payload, mac) = Self::encrypt_packet(header_packet_bytes, key_pair.clone(), reader_public_key)?;
@@ -203,7 +264,7 @@ impl Header {
 				mac,
 			};
 
-			header_packets.push(packet);
+			header_packets.push((packet, data_key));
 		}
 		
 
@@ -214,7 +275,7 @@ impl Header {
 		// let header_packets = crate::Crypt4Gh::encrypt(&header_content, recipients, None)?;
 		// let header_bytes = serialize_header_packets(header_packets);
 
-		// Ok(CypherText::from(header_bytes))
+		// Ok(CipherText::from(header_bytes))
 		Ok(header_packets)
 	}
 
@@ -231,6 +292,26 @@ impl Header {
 	/// Get the inner bytes and size.
 	pub fn into_inner(self) -> (Vec<Packet>, u64) {
 		unimplemented!()
+	}
+
+	/// Convert the header to bytes.
+	pub fn to_bytes(self) -> Vec<u8> {
+		let mut bytes = Vec::with_capacity(
+			MAGIC_NUMBER.len() + mem::size_of::<u32>() + mem::size_of::<u32>() + self.packets.iter().map(|p| p.length as usize).sum::<usize>()
+		);
+		bytes.extend_from_slice(&self.magic.0);
+		bytes.extend_from_slice(&self.version.to_le_bytes());
+		bytes.extend_from_slice(&self.count.to_le_bytes());
+		for packet in &self.packets {
+			bytes.extend_from_slice(&packet.length.to_le_bytes());
+			bytes.extend_from_slice(&packet.encryption_method.to_bytes());
+			bytes.extend_from_slice(packet.writer_public_key.as_slice());
+			bytes.extend_from_slice(packet.nonce.as_slice());
+			bytes.extend_from_slice(&packet.encrypted_payload);
+			bytes.extend_from_slice(packet.mac.as_slice());
+		}
+		
+		bytes
 	}
 
 	/// Crypt4gh spec §3.3.1 - X25519 ChaCha20 IETF Poly1305 Encryption

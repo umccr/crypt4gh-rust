@@ -1,6 +1,6 @@
 use tokio::io::AsyncRead;
 
-use crate::{cyphertext::CypherText, error::Crypt4GHError, keys::KeyPair, plaintext::PlainText, Crypt4GhBuilder};
+use crate::{ciphertext::DataBlocks, error::Crypt4GHError, keys::KeyPair, plaintext::PlainText, CipherText, Crypt4GhBuilder};
 
 pub struct Reader<R> {
     inner: R,
@@ -21,9 +21,9 @@ impl<R> Reader<R>
 where
     R: AsyncRead + Unpin,
 {
-    pub fn decrypt(&mut self, keys: KeyPair, cyphertext: CypherText) -> Result<PlainText, Crypt4GHError> {
+    pub fn decrypt(&mut self, keys: KeyPair, ciphertext: CipherText) -> Result<PlainText, Crypt4GHError> {
         let c4gh = Crypt4GhBuilder::new(keys.clone()).build(); // TODO: Take as_ref() in this new to avoid .clone()?
-        c4gh.decrypt(cyphertext, keys.private_key().clone())
+        c4gh.decrypt(ciphertext, keys.private_key().clone())
     }
 }
 

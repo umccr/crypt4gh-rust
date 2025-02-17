@@ -2,12 +2,17 @@
 
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
 use crypto_kx;
-use rand::{rngs::OsRng, RngCore, SeedableRng};
+// use rand::{rngs::OsRng, RngCore, SeedableRng};
 use serde::Serialize;
 // TODO: We'll need to accomodate types such as Crypt4GHPubkey, Crypt4GHPrivkey
 use ssh_key::{public::PublicKey as SSHPublicKey, public::Ed25519PublicKey};
 
 use crate::{error::Crypt4GHError, Recipients};
+
+use chacha20poly1305::{
+    aead::{Aead, AeadCore, OsRng}, Nonce
+};
+
 
 /// Crypt4GH §3.2
 const C4GH_MAGIC_WORD: &[u8; 7] = b"c4gh-v1";
@@ -40,7 +45,7 @@ impl EncryptionMethod {
 /// Crypt4GH §2.1.1 Asymmetric Keys
 /// 
 /// Public/Private KeyPair information.
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct KeyPair {
 	/// Method used for the key encryption.
 	/// > Only method 0 is supported.
@@ -73,7 +78,7 @@ impl SharedKeys {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DataKey {
 	inner: [u8; DATA_KEY_LENGTH]
 }
@@ -160,19 +165,20 @@ impl KeyPair {
 	// 	PublicKey::ChaCha20Poly1305(genkey)
 	// }
 	/// Generates a Crypt4GH KeyPair from scratch using RustCrypto's crypto_kx
-	pub fn generate(&mut self) -> Self {
+	pub fn generate() -> Self {
 		let keypair = crypto_kx::Keypair::generate(&mut OsRng);
 
 		let mut public_keys = vec![];
-		public_keys.push(PublicKey::from(keypair.public().as_ref().as_slice().to_vec()));
+		public_keys.push(PublicKey::new(keypair.public().as_ref().to_vec()));
 		let recipients = Recipients::from(public_keys);
 
 		let private_key = PrivateKey::from(keypair.secret().to_bytes().to_vec());
 
-		self.public_keys = recipients;
-		self.private_key = private_key;
+		Self::new(EncryptionMethod::X25519Chacha20Poly305, private_key, recipients)
+		// self.public_keys = recipients;
+		// self.private_key = private_key;
 
-		self.to_owned()
+		// self.to_owned()
 	}
 
 	/// Create a new KeyPair from pre-existing public and private keys
@@ -185,8 +191,8 @@ impl KeyPair {
 	}
 
 	/// Get the inner keys.
-	pub fn into_inner(&self) -> (PrivateKey, Recipients) {
-		(self.private_key.clone(), self.public_keys.to_owned())
+	pub fn into_inner(self) -> (PrivateKey, Recipients) {
+		(self.private_key, self.public_keys)
 	}
 
 	/// Get private key.
@@ -222,6 +228,7 @@ impl KeyPair {
 // 	Crypt4GH,
 // }
 
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub struct PrivateKey {
 	inner: Vec<u8>,
 }

@@ -10,8 +10,6 @@ bincode = "1"
 chacha20poly1305 = { version = "0.10", features = ["std"]}
 crypto_kx = "0.2"
 noodles = { version = "0.91", features = ["async", "cram"] }
-# rand = { version = "0.9", features = ["rand_chacha"] } # Requires nightly, but interesting to enable in the future: features = [ "simd" ] }
-                            # Not a crypto lib, should we use it at all then?: https://github.com/rust-random/rand/pull/1514
 rand_chacha = { version = "0.9" }
 serde = { version = "1", features = ["derive"] }
 ssh-key = { version = "0.6", features=["ed25519"] }

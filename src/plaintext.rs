@@ -1,4 +1,4 @@
-use crate::cyphertext::CypherText;
+use crate::ciphertext::DataBlocks;
 use crate::error::Crypt4GHError;
 use crate::keys::KeyPair;
 use crate::{Crypt4GhBuilder, Recipients};
@@ -33,11 +33,11 @@ impl PlainText {
 		plaintext: PlainText,
 		recipients: Recipients,
 		keys: KeyPair,
-	) -> Result<CypherText, Crypt4GHError> {
+	) -> Result<DataBlocks, Crypt4GHError> {
 		// FIXME: Revisit builder and/or this function to adjust .with_range() bounds... 0 is incorrect
 		let cg4h = Crypt4GhBuilder::new(keys.clone()).with_range(0..plaintext.length()).build();
-		let cyphertext = cg4h.encrypt(plaintext, keys, recipients)?;
-		Ok(cyphertext)
+		let ciphertext = cg4h.encrypt(plaintext, keys, recipients)?;
+		Ok(ciphertext.data_blocks)
 	}
 
 	pub fn length(&self) -> usize {
