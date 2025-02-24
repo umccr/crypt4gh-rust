@@ -239,38 +239,42 @@ impl Header {
 			return Err(Crypt4GHError::UnsupportedVersion(version));
 		}
 
-		let mut offset = MAGIC_NUMBER.len() + mem::size_of::<u32>() * 2;
 		let mut packets = Vec::with_capacity(count as usize);
+		let mut bytes = &bytes[MAGIC_NUMBER.len() + mem::size_of::<u32>() * 2..];
 
 		for _ in 0..count {
-			if bytes.len() < offset + mem::size_of::<u32>() {
+			if bytes.len() < mem::size_of::<u32>() {
 				return Err(Crypt4GHError::InvalidHeader);
 			}
 
-			// TODO: Is this correct? offset+4 and then add 4 more?
-			let length = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
-			offset += 4;
+			let (length_bytes, rest) = bytes.split_at(mem::size_of::<u32>());
+			let length = u32::from_le_bytes(length_bytes.try_into().unwrap());
+			bytes = rest;
 
-			if bytes.len() < offset + length as usize {
+			if bytes.len() < length as usize {
 				return Err(Crypt4GHError::InvalidHeader);
 			}
 
-			let encryption_method = EncryptionMethod::from_bytes(&bytes[offset..offset + ENCRYPTION_METHOD_SIZE].try_into().unwrap())?;
-			offset += ENCRYPTION_METHOD_SIZE;
+			let (encryption_method_bytes, rest) = bytes.split_at(ENCRYPTION_METHOD_SIZE);
+			let encryption_method = EncryptionMethod::from_bytes(encryption_method_bytes.try_into().unwrap())?;
+			bytes = rest;
 
-			let writer_public_key = PublicKey::new(bytes[offset..offset + 32].to_vec());
-			// TODO: Validate PublicKey length
-			//offset += PublicKey::LENGTH;
-			offset += 12;
+			let (writer_public_key_bytes, rest) = bytes.split_at(32);
+			let writer_public_key = PublicKey::new(writer_public_key_bytes.to_vec());
+			bytes = rest;
 
-			let nonce = *Nonce::from_slice(&bytes[offset..offset + NONCE_LENGTH]);
-			offset += NONCE_LENGTH;
+			let (nonce_bytes, rest) = bytes.split_at(NONCE_LENGTH);
+			let nonce = *Nonce::from_slice(nonce_bytes);
+			bytes = rest;
 
-			let encrypted_payload = bytes[offset..offset + (length as usize - ENCRYPTION_METHOD_SIZE - 12 - NONCE_LENGTH - MAC_LENGTH)].to_vec();
-			offset += encrypted_payload.len();
+			let encrypted_payload_length = length as usize - ENCRYPTION_METHOD_SIZE - 32 - NONCE_LENGTH - MAC_LENGTH;
+			let (encrypted_payload_bytes, rest) = bytes.split_at(encrypted_payload_length);
+			let encrypted_payload = encrypted_payload_bytes.to_vec();
+			bytes = rest;
 
-			let mac = Mac::from(bytes[offset..offset + MAC_LENGTH].to_vec());
-			offset += MAC_LENGTH;
+			let (mac_bytes, rest) = bytes.split_at(MAC_LENGTH);
+			let mac = Mac::from(mac_bytes.to_vec());
+			bytes = rest;
 
 			packets.push(Packet {
 				length,
