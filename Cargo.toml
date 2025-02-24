@@ -9,7 +9,7 @@ base64ct = "1"
 bincode = "1"
 chacha20poly1305 = { version = "0.10", features = ["std"]}
 crypto_kx = "0.2"
-noodles = { version = "0.91", features = ["async", "cram"] }
+noodles = { version = "0.93", features = ["async", "cram"] }
 rand_chacha = { version = "0.9" }
 serde = { version = "1", features = ["derive"] }
 ssh-key = { version = "0.6", features=["ed25519"] }

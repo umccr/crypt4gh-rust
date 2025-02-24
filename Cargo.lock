@@ -699,9 +699,9 @@ dependencies = [
 
 [[package]]
 name = "noodles"
-version = "0.91.0"
+version = "0.93.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abe598fe237b539488e581c7ec5e6a8c253dfddce8425442ed3135adf8a779df"
+checksum = "74eea88cacba7e16cb6aff1bc3e077f3f9e036e59b9107a8415bf9242d0c2d97"
 dependencies = [
  "noodles-bam",
  "noodles-bcf",
@@ -737,9 +737,9 @@ dependencies = [
 
 [[package]]
 name = "noodles-bcf"
-version = "0.70.0"
+version = "0.71.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a54167971ced0f1bf609b350eb6a879438360ec17d833b37074205bc0c006e49"
+checksum = "c76d44299bdc4c950dcbbfeb87b99e79de9c4082f51d892a6d7aa194fba27613"
 dependencies = [
  "byteorder",
  "futures",
@@ -780,15 +780,14 @@ dependencies = [
 
 [[package]]
 name = "noodles-cram"
-version = "0.77.0"
+version = "0.79.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df750fe7f5ed0dc0dccccbcc099e503d37880eaed88c1b35849c5fa3c46075e3"
+checksum = "c75663c2a0d6f0142581f810702add845d99b89dea2e3b8b472f7a18b7ffc2c3"
 dependencies = [
  "async-compression",
  "bitflags",
  "bstr",
  "byteorder",
- "bytes",
  "bzip2",
  "flate2",
  "futures",
