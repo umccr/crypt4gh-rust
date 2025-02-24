@@ -260,6 +260,34 @@ impl Crypt4Gh {
 		Ok(Crypt4GHFile::new(header, data_blocks))
 	}
 
+	/// Crypt4gh spec §4.1 - chacha20 ietf poly1305 Decryption
+	/// 
+	/// The cipher-text is decrypted by authenticating and decrypting the segment(s) enclosing the requested byte
+	/// range [P ; Q], where P < Q. For a range starting at position P, the location of the segment seg_start
+	/// containing that position must first be found. For the chacha20 ietf poly1305 method, when no edit list is in
+	/// use, this can be done using the formula:
+	/// 
+	/// seg_start = header_len + floor(P/65536) * 65564
+	/// 
+	/// For an encrypted segment starting at position seg_start, the nonce, then the 65536 bytes of cipher-text
+	/// (possibly fewer if it was the last segment), and finally the MAC are read.
+	/// 
+	/// An authentication tag is calculated over the cipher-text from that segment, and bit-wise compared to the
+	/// MAC. The cipher-text is authenticated if and only if the tags match. If more than one key (K_data) was
+	/// included in the header, each should be tried in turn until either one authenticates correctly or no keys are
+	/// left to try. An error MUST be reported if the cipher-text is not authenticated.
+	/// 
+	/// The key K_data and nonce N are then used to decrypt the cipher-text for the segment, returning the plain-
+	/// text. Successive segments are decrypted, until the segment containing position Q is reached. The plain-text
+	/// segments are concatenated to form the resulting output, discarding P % 65536 bytes from the beginning of
+	/// the first segment and retaining Q % 65536 bytes of the last one.
+	/// 
+	/// If more than one key (K_data) is in use, readers can speed up decryption by trying the previous successful
+	/// key first when attempting to authenticate each block. However, this does open up a possible timing attack
+	/// where an observer watching the decoding process can find out where key changes occur due to the extra
+	/// time needed to select the new key at these points. If this is unacceptable, readers could either try each key
+	/// for every block (although this may still be vulnerable to timing attacks which try to detect which key was
+	/// successful); or simply insist that only one key is used for the whole file.
 	pub fn decrypt(self, cyphertext: CipherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
 		todo!();
 		// Ok(PlainText::from("payload".as_bytes().to_vec()))
