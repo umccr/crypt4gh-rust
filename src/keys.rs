@@ -40,9 +40,17 @@ impl EncryptionMethod {
 	pub fn to_bytes(self) -> [u8; ENCRYPTION_METHOD_SIZE] {
 		(self as u32).to_le_bytes()
 	}
+
+	/// Convert bytes to the enum.
+	pub fn from_bytes(bytes: &[u8; ENCRYPTION_METHOD_SIZE]) -> Result<Self, Crypt4GHError> {
+		match u32::from_le_bytes(*bytes) {
+			0 => Ok(EncryptionMethod::X25519Chacha20Poly305),
+			_ => Err(Crypt4GHError::InvalidEncryptionMethod),
+		}
+	}
 }
 
-/// Crypt4GH §2.1.1 Asymmetric Keys
+/// Crypt4GH §2.1.1 - Asymmetric Keys
 /// 
 /// Public/Private KeyPair information.
 #[derive(Debug, Clone, PartialEq, Hash, Eq)]
@@ -56,9 +64,8 @@ pub struct KeyPair {
 	pub public_keys: Recipients,
 }
 
-/// Crypt4Gh spec Symmetric Keys §2.1.2
+/// Crypt4Gh spec - Symmetric Keys §2.1.2
 ///
-
 /// Shared key(s), also known as K_shared
 /// 
 /// Used to encrypt header packet data. 
@@ -67,7 +74,6 @@ pub struct KeyPair {
 /// 
 /// The writer will use the first of these derivations 
 /// and the reader will use the second
-
 pub struct SharedKeys {
 	inner: Vec<Vec<u8>>
 }

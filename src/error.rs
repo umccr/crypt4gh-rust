@@ -22,6 +22,8 @@ pub enum Crypt4GHError {
 	NoKey,
 	#[error("Unable to wrap key")]
 	BadKey,
+	#[error("Invalid input data: {0}")]
+	InvalidInputData(String),
 	// #[error("Unable to decrypt key (ERROR = {0:?})")]
 	// DecryptKeyError(SymmetricCipherError),
 	#[error("Invalid key format")]
@@ -76,6 +78,8 @@ pub enum Crypt4GHError {
 	ScryptParamsError,
 	#[error("BcryptPBKDF error")]
 	BcryptPBKDFError,
+	#[error("Invalid encryption method")]
+	InvalidEncryptionMethod,
 
 	// Reading errors
 	#[error("Unable to read {0} bytes from input (ERROR = {1:?})")]
@@ -126,6 +130,10 @@ pub enum Crypt4GHError {
 	NoSupportedEncryptionMethod,
 
 	// Header
+	#[error("Invalid header")]
+	InvalidHeader,
+	#[error("Unsupported version: {0}")]
+	UnsupportedVersion(u32),
 	#[error("No header packet could be decrypted")]
 	NoValidHeaderPacket,
 

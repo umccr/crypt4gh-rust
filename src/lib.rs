@@ -77,7 +77,9 @@ impl Segment {
 	/// Returns [ nonce + `encrypted_data` + mac].
 	///
 	pub fn new_from_key(data: &[u8], key: &DataKey) -> Result<Self, Crypt4GHError> {
-		// TODO: Add basic input validation? (len(data)>0)...
+		if data.is_empty() {
+			return Err(Crypt4GHError::InvalidInputData("Data cannot be empty".to_string()));
+		}
 		
 		// Convert Crypt4GH to RustCrypto primitives/cipher
 		let key_array = GenericArray::clone_from_slice(key.as_slice());
@@ -230,6 +232,13 @@ impl Crypt4GHFile {
 		bytes.extend_from_slice(&self.data_blocks.to_bytes());
 		bytes
 	}
+
+	pub fn from_ciphertext(ciphertext: CipherText) -> Result<Self, Crypt4GHError> {
+		unimplemented!()
+	}
+
+
+
 }
 
 
@@ -288,7 +297,10 @@ impl Crypt4Gh {
 	/// time needed to select the new key at these points. If this is unacceptable, readers could either try each key
 	/// for every block (although this may still be vulnerable to timing attacks which try to detect which key was
 	/// successful); or simply insist that only one key is used for the whole file.
-	pub fn decrypt(self, cyphertext: CipherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
+	/// 
+	/// TODO: Should this function accept Crypt4GHFile or CipherText?
+	pub fn decrypt(self, ciphertext: CipherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
+		let crypt4gh_file = Crypt4GHFile::from_ciphertext(ciphertext);
 		todo!();
 		// Ok(PlainText::from("payload".as_bytes().to_vec()))
 	}

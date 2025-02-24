@@ -1,5 +1,6 @@
 
 use std::mem;
+
 use crate::error::Crypt4GHError;
 use crate::keys::{self, DataKey, EncryptionMethod, KeyPair, PublicKey, ENCRYPTION_METHOD_SIZE};
 
@@ -12,7 +13,7 @@ use chacha20poly1305::{
     ChaCha20Poly1305, Nonce
 };
 
-use crate::{Mac, Recipients, MAC_LENGTH};
+use crate::{Mac, Recipients, MAC_LENGTH, NONCE_LENGTH};
 
 const MAGIC_NUMBER: &[u8; 8] = b"crypt4gh";
 const VERSION: u32 = 1;
@@ -222,6 +223,71 @@ impl Header {
 		let packets = Self::encrypt(recipients, key_pair)?;
 		let (packets, data_keys) = packets.into_iter().unzip();
 		Ok((Self::new(packets), data_keys))
+	}
+
+	// TODO: Horrible way to parse, simplify/refactor the for loop with more sensible methods/parsing
+	pub fn from_bytes(bytes: &[u8]) -> Result<Self, Crypt4GHError> {
+		if bytes.len() < MAGIC_NUMBER.len() + mem::size_of::<u32>() * 2 {
+			return Err(Crypt4GHError::InvalidHeader);
+		}
+
+		let magic = Magic(*MAGIC_NUMBER);
+		let version = u32::from_le_bytes(bytes[MAGIC_NUMBER.len()..MAGIC_NUMBER.len() + 4].try_into().unwrap());
+		let count = u32::from_le_bytes(bytes[MAGIC_NUMBER.len() + 4..MAGIC_NUMBER.len() + 8].try_into().unwrap());
+
+		if version != VERSION {
+			return Err(Crypt4GHError::UnsupportedVersion(version));
+		}
+
+		let mut offset = MAGIC_NUMBER.len() + mem::size_of::<u32>() * 2;
+		let mut packets = Vec::with_capacity(count as usize);
+
+		for _ in 0..count {
+			if bytes.len() < offset + mem::size_of::<u32>() {
+				return Err(Crypt4GHError::InvalidHeader);
+			}
+
+			// TODO: Is this correct? offset+4 and then add 4 more?
+			let length = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
+			offset += 4;
+
+			if bytes.len() < offset + length as usize {
+				return Err(Crypt4GHError::InvalidHeader);
+			}
+
+			let encryption_method = EncryptionMethod::from_bytes(&bytes[offset..offset + ENCRYPTION_METHOD_SIZE].try_into().unwrap())?;
+			offset += ENCRYPTION_METHOD_SIZE;
+
+			let writer_public_key = PublicKey::new(bytes[offset..offset + 32].to_vec());
+			// TODO: Validate PublicKey length
+			//offset += PublicKey::LENGTH;
+			offset += 12;
+
+			let nonce = *Nonce::from_slice(&bytes[offset..offset + NONCE_LENGTH]);
+			offset += NONCE_LENGTH;
+
+			let encrypted_payload = bytes[offset..offset + (length as usize - ENCRYPTION_METHOD_SIZE - 12 - NONCE_LENGTH - MAC_LENGTH)].to_vec();
+			offset += encrypted_payload.len();
+
+			let mac = Mac::from(bytes[offset..offset + MAC_LENGTH].to_vec());
+			offset += MAC_LENGTH;
+
+			packets.push(Packet {
+				length,
+				encryption_method,
+				writer_public_key,
+				nonce,
+				encrypted_payload,
+				mac,
+			});
+		}
+
+		Ok(Self {
+			magic,
+			version,
+			count,
+			packets,
+		})
 	}
 
 	/// Crypt4gh spec §3.3.1 - X25519 ChaCha20 IETF Poly1305 Encryption
