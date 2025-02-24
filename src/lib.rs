@@ -17,6 +17,7 @@ use header::{Header, HeaderWithKeys};
 use keys::{DataKey, PrivateKey};
 use plaintext::PlainText;
 use chacha20poly1305::aead::OsRng;
+use ssh_key::rand_core::RngCore;
 
 use crate::error::Crypt4GHError;
 use crate::keys::{KeyPair, PublicKey};
@@ -146,6 +147,14 @@ impl Recipients {
 #[derive(Clone)]
 pub struct Seed {
 	pub inner: [u8; 32],
+}
+
+impl Seed {
+	pub fn new() -> Self {
+		let mut inner = [0u8; 32];
+		OsRng.fill_bytes(&mut inner);
+		Seed { inner }
+	}
 }
 
 /// Crypt4gh spec §3.3.1 - X25519 ChaCha20 IETF Poly1305 Encryption
@@ -288,7 +297,7 @@ impl Crypt4GhBuilder {
 		Crypt4Gh {
 			keys: self.keys,
 			range: self.range.unwrap_or(0..usize::MAX),
-			seed: self.seed.unwrap(),
+			seed: Seed::new(),
 		}
 	}
 
