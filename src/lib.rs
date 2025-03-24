@@ -107,6 +107,22 @@ impl Segment {
 		bytes.extend_from_slice(&self.mac.inner);
 		bytes
 	}
+
+	pub fn from_bytes(bytes: &[u8]) -> Result<Self, Crypt4GHError> {
+		if bytes.len() < NONCE_LENGTH + MAC_LENGTH {
+			return Err(Crypt4GHError::InvalidInputData("Not enough bytes to form a Segment".to_string()));
+		}
+
+		let nonce = Nonce::from(bytes[..NONCE_LENGTH].to_vec());
+		let mac = Mac::from(bytes[bytes.len() - MAC_LENGTH..].to_vec());
+		let cipher_text = CipherText::new(bytes[NONCE_LENGTH..bytes.len() - MAC_LENGTH].to_vec());
+
+		Ok(Segment::new(nonce, cipher_text, mac))
+	}
+
+	pub fn length(&self) -> usize {
+		NONCE_LENGTH + self.cipher_text.inner.len() + MAC_LENGTH
+	}
 }
 
 #[derive(Clone)]
@@ -233,12 +249,11 @@ impl Crypt4GHFile {
 		bytes
 	}
 
-	pub fn from_ciphertext(ciphertext: CipherText) -> Result<Self, Crypt4GHError> {
-		unimplemented!()
+	pub fn from_ciphertext(self, ciphertext: CipherText) -> Result<Self, Crypt4GHError> {
+		let header = Header::from_bytes(self.header.to_bytes().as_slice())?;
+		let data_blocks = DataBlocks::from_bytes(self.data_blocks.to_bytes().as_slice())?;
+		Ok(Crypt4GHFile::new(header, data_blocks))
 	}
-
-
-
 }
 
 
@@ -300,7 +315,7 @@ impl Crypt4Gh {
 	/// 
 	/// TODO: Should this function accept Crypt4GHFile or CipherText?
 	pub fn decrypt(self, ciphertext: CipherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
-		let crypt4gh_file = Crypt4GHFile::from_ciphertext(ciphertext);
+		//let crypt4gh_file = Crypt4GHFile::from_ciphertext(ciphertext)?;
 		todo!();
 		// Ok(PlainText::from("payload".as_bytes().to_vec()))
 	}

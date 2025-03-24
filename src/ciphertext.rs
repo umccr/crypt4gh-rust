@@ -30,4 +30,16 @@ impl DataBlocks {
 		bytes
 	}
 
+	pub fn from_bytes(bytes: &[u8]) -> Result<Self, Crypt4GHError> {
+		let mut segments = Vec::new();
+		let mut offset = 0;
+
+		while offset < bytes.len() {
+			let segment = Segment::from_bytes(&bytes[offset..])?;
+			offset += segment.length();
+			segments.push(segment);
+		}
+
+		Ok(DataBlocks { segments })
+	}
 }
