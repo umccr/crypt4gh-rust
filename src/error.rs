@@ -57,7 +57,7 @@ pub enum Crypt4GHError {
 	#[error("Unable to encrypt packet: None of the keys were used in {0}")]
 	UnableToEncryptPacket(String),
 	#[error("Decryption failed -> Invalid data: {0}")]
-	InvalidData(String),
+	InvalidDataBlock(String),
 
 	// Key errors
 	#[error("Unable to extract public server key")]

@@ -12,7 +12,7 @@ use chacha20poly1305::aead::{Aead, AeadMutInPlace};
 use chacha20poly1305::consts::U32;
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
-use ciphertext::DataBlocks;
+use ciphertext::{CipherText, DataBlocks};
 use header::{Header, HeaderWithKeys};
 use keys::{DataKey, PrivateKey};
 use plaintext::PlainText;
@@ -33,23 +33,6 @@ pub const NONCE_LENGTH: usize = 12;
 /// Crypt4gh spec §3.4.2 - Segmenting the input
 pub const PLAINTEXT_SEGMENT_SIZE: usize = 65535;
 
-#[derive(Debug)]
-pub struct CipherText {
-	inner: Vec<u8>
-}
-
-impl CipherText {
-	pub fn new(inner: Vec<u8>) -> Self {
-		Self { inner }
-	}
-	// TODO: Move this whole struct and impl to ciphertext.rs
-	pub fn decrypt(self, keys: KeyPair) -> Result<PlainText, Crypt4GHError> {
-		let cg4h = Crypt4GhBuilder::new(keys.clone()).build();
-		let plaintext = cg4h.decrypt(self, keys.private_key().clone())?;
-		Ok(plaintext)
-	}
-}
-
 /// To allow random access without having to authenticate the entire file, the plain-text is divided into 65536-byte (64KiB) segments.
 /// If the plain-text is not a multiple of 64KiB long, the last segment will be shorter. Each segment is encrypted
 /// using the method defined in the header. The nonce used to encrypt the segment is then stored, followed by the encrypted data, and then the MAC.
@@ -58,9 +41,9 @@ impl CipherText {
 /// so a 65536 byte plain-text input will become a 65564 byte encrypted and authenticated cipher-text output.
 #[derive(Debug)]
 pub struct Segment {
-	nonce: Nonce,
-	cipher_text: CipherText,
-	mac: Mac,
+	pub nonce: Nonce,
+	pub cipher_text: CipherText,
+	pub mac: Mac,
 }
 
 impl Segment {
@@ -180,12 +163,12 @@ impl Seed {
 /// (...) The nonce is a unique initialisation vector. In ChaCha20-IETF-Poly1305 it is 12 bytes long.
 /// This value MUST be unique for each packet encrypted with the same reader’s and writer’s keys.
 /// The best way to ensure this is to generate a value with a cryptographically-secure random number generator.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Nonce {
 	pub inner: [u8; NONCE_LENGTH],
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mac {
 	pub inner: [u8; MAC_LENGTH],
 }
@@ -198,6 +181,15 @@ impl Mac {
 	pub fn as_slice(&self) -> &[u8; MAC_LENGTH] {
 		&self.inner
 	}
+
+	pub fn from_slice(slice: &[u8]) -> Result<Self, Crypt4GHError> {
+        if slice.len() != MAC_LENGTH {
+            return Err(Crypt4GHError::InvalidDataBlock("Invalid MAC length".to_string()));
+        }
+        let mut inner = [0u8; MAC_LENGTH];
+        inner.copy_from_slice(slice);
+        Ok(Mac { inner })
+    }
 }
 
 impl Nonce {
@@ -209,8 +201,16 @@ impl Nonce {
 	pub fn into_inner(self) -> [u8; NONCE_LENGTH] {
 		self.inner
 	}
-}
 
+    pub fn from_slice(slice: &[u8]) -> Result<Self, Crypt4GHError> {
+        if slice.len() != NONCE_LENGTH {
+            return Err(Crypt4GHError::UnableToWrapNonce);
+        }
+        let mut inner = [0u8; NONCE_LENGTH];
+        inner.copy_from_slice(slice);
+        Ok(Nonce { inner })
+    }
+}
 
 impl From<Vec<u8>> for Nonce {
 	fn from(bytes: Vec<u8>) -> Self {
@@ -286,15 +286,6 @@ impl Crypt4Gh {
 
 	/// Crypt4gh spec §4.1 - chacha20 ietf poly1305 Decryption
 	/// 
-	/// The cipher-text is decrypted by authenticating and decrypting the segment(s) enclosing the requested byte
-	/// range [P ; Q], where P < Q. For a range starting at position P, the location of the segment seg_start
-	/// containing that position must first be found. For the chacha20 ietf poly1305 method, when no edit list is in
-	/// use, this can be done using the formula:
-	/// 
-	/// seg_start = header_len + floor(P/65536) * 65564
-	/// 
-	/// For an encrypted segment starting at position seg_start, the nonce, then the 65536 bytes of cipher-text
-	/// (possibly fewer if it was the last segment), and finally the MAC are read.
 	/// 
 	/// An authentication tag is calculated over the cipher-text from that segment, and bit-wise compared to the
 	/// MAC. The cipher-text is authenticated if and only if the tags match. If more than one key (K_data) was
@@ -313,14 +304,27 @@ impl Crypt4Gh {
 	/// for every block (although this may still be vulnerable to timing attacks which try to detect which key was
 	/// successful); or simply insist that only one key is used for the whole file.
 	/// 
-	/// TODO: Should this function accept Crypt4GHFile or CipherText?
-	pub fn decrypt(self, ciphertext: CipherText, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
-		//let crypt4gh_file = Crypt4GHFile::from_ciphertext(ciphertext)?;
-		todo!();
-		// Ok(PlainText::from("payload".as_bytes().to_vec()))
-	}
-
+	/// 
+	pub fn decrypt(self, c4gh_file: Crypt4GHFile, private_key: PrivateKey) -> Result<PlainText, Crypt4GHError> {
+		// The cipher-text is decrypted by authenticating and decrypting the segment(s) enclosing the requested byte
+		// range [P ; Q], where P < Q. For a range starting at position P, the location of the segment seg_start
+		// containing that position must first be found. For the chacha20 ietf poly1305 method, when no edit list is in
+		// use, this can be done using the formula:
+		//
+		// seg_start = header_len + floor(P/65536) * 65564
 	
+		// TODO: Tweak calculation for the case of edit lists present... and add floor()
+		//let seg_start = c4gh_file.header.len() + self.range.start_bound().into() * PLAINTEXT_SEGMENT_SIZE;
+
+		// For an encrypted segment starting at position seg_start, the nonce, then the 65536 bytes of cipher-text
+		// (possibly fewer if it was the last segment), and finally the MAC are read.
+		// for data_block in c4gh_file.data_blocks.into_iter() {
+		// 	let segment = data_block
+		// }
+
+		// Ok(())
+		todo!()
+	}
 }
 
 impl Crypt4GhBuilder {
