@@ -2,7 +2,7 @@
 use std::mem;
 
 use crate::error::Crypt4GHError;
-use crate::keys::{self, DataKey, EncryptionMethod, KeyPair, PublicKey, ENCRYPTION_METHOD_SIZE};
+use crate::keys::{self, DataKey, EncryptionMethod, KeyPair, PrivateKey, PublicKey, ENCRYPTION_METHOD_SIZE};
 
 use chacha20poly1305::aead::generic_array::GenericArray;
 use chacha20poly1305::aead::AeadMutInPlace;
@@ -204,8 +204,41 @@ struct EditListPacket {
 	lengths: Vec<u64>,		// An array of byte counts.
 }
 
+#[derive(Debug, Clone)]
+//TODO: Double check the naming of this type on the spec (and its semantics)
+pub struct SharedKey {
+	inner: Vec<u8>,
+}
+
+impl SharedKey {
+	pub fn new(inner: Vec<u8>) -> Self {
+		Self { inner }
+	}
+
+	pub fn into_inner(self) -> Vec<u8> {
+		self.inner
+	}
+}
+
 /// Implements all header-related operations described in Crypt4gh spec §3.3 - Header packet encryption
 impl Header {
+	/// Decrypts the shared key contained within the header which can be used to decrypt data blocks.
+	pub fn decrypt_key(self, private_key: PrivateKey) -> Result<SharedKey, Crypt4GHError> {
+		// TODO: Just get the first one for now, for simplic
+		let packet = self.packets.first().expect("expected first packet").clone();
+
+		let key = GenericArray::<u8, U32>::from_slice(&private_key.as_slice());
+		let mut decrypt = ChaCha20Poly1305::new(key);
+
+		let mac = GenericArray::from(packet.mac.inner);
+		let nonce = GenericArray::from(packet.nonce);
+		let mut buffer = packet.encrypted_payload.clone();
+		decrypt.decrypt_in_place_detached(&nonce, &[], &mut buffer, &mac);
+
+		Ok(SharedKey::new(buffer))
+	}
+
+
 	pub fn new(packets: Vec<Packet>) -> Self {
 		Self {
 			magic: Magic(*MAGIC_NUMBER),
@@ -364,11 +397,13 @@ impl Header {
 		unimplemented!()
 	}
 
+	pub fn length(&self) -> usize {
+		MAGIC_NUMBER.len() + mem::size_of::<u32>() + mem::size_of::<u32>() + self.packets.iter().map(|p| p.length as usize).sum::<usize>()
+	}
+
 	/// Convert the header to bytes.
 	pub fn to_bytes(self) -> Vec<u8> {
-		let mut bytes = Vec::with_capacity(
-			MAGIC_NUMBER.len() + mem::size_of::<u32>() + mem::size_of::<u32>() + self.packets.iter().map(|p| p.length as usize).sum::<usize>()
-		);
+		let mut bytes = Vec::with_capacity(self.length());
 		bytes.extend_from_slice(&self.magic.0);
 		bytes.extend_from_slice(&self.version.to_le_bytes());
 		bytes.extend_from_slice(&self.count.to_le_bytes());

@@ -5,6 +5,7 @@ pub mod keys;
 pub mod plaintext;
 pub mod io;
 
+use std::mem;
 use std::ops::RangeBounds;
 
 use chacha20poly1305::aead::generic_array::GenericArray;
@@ -228,6 +229,7 @@ impl From<Vec<u8>> for Mac {
 	}
 }
 
+/// Represents encrypted data.
 pub struct Crypt4GHFile {
 	header: Header,
 	data_blocks: DataBlocks,
@@ -249,9 +251,13 @@ impl Crypt4GHFile {
 		bytes
 	}
 
-	pub fn from_ciphertext(self, ciphertext: CipherText) -> Result<Self, Crypt4GHError> {
-		let header = Header::from_bytes(self.header.to_bytes().as_slice())?;
-		let data_blocks = DataBlocks::from_bytes(self.data_blocks.to_bytes().as_slice())?;
+	pub fn from_ciphertext(ciphertext: CipherText) -> Result<Self, Crypt4GHError> {
+		let header = Header::from_bytes(ciphertext.inner.as_slice())?;
+
+		let length = header.length();
+		let (_, data) = ciphertext.inner.split_at(length);
+
+		let data_blocks = DataBlocks::from_bytes(data)?;
 		Ok(Crypt4GHFile::new(header, data_blocks))
 	}
 }
@@ -314,16 +320,20 @@ impl Crypt4Gh {
 		// seg_start = header_len + floor(P/65536) * 65564
 	
 		// TODO: Tweak calculation for the case of edit lists present... and add floor()
-		//let seg_start = c4gh_file.header.len() + self.range.start_bound().into() * PLAINTEXT_SEGMENT_SIZE;
+		// let seg_start = c4gh_file.header.len() + self.range.start_bound().into() * PLAINTEXT_SEGMENT_SIZE;
 
+		let mut data_buffer = vec![];
+		/// Get the encrypted payload from the header.
+		let header_private_key = c4gh_file.header.decrypt_key(private_key)?;
 		// For an encrypted segment starting at position seg_start, the nonce, then the 65536 bytes of cipher-text
 		// (possibly fewer if it was the last segment), and finally the MAC are read.
-		// for data_block in c4gh_file.data_blocks.into_iter() {
-		// 	let segment = data_block
-		// }
+		for data_block in c4gh_file.data_blocks.into_iter() {
+			let segment = data_block.decrypt(header_private_key.clone())?;
 
-		// Ok(())
-		todo!()
+			data_buffer.extend(segment);
+		}
+
+		Ok(PlainText::from(data_buffer))
 	}
 }
 
