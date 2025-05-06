@@ -13,7 +13,7 @@ use chacha20poly1305::aead::{Aead, AeadMutInPlace};
 use chacha20poly1305::consts::U32;
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
-use ciphertext::{CipherText, DataBlocks};
+use ciphertext::{CipherText, DataBlock, DataBlocks};
 use header::{Header, HeaderWithKeys};
 use keys::{DataKey, PrivateKey};
 use plaintext::PlainText;
@@ -107,19 +107,6 @@ impl Segment {
 	pub fn length(&self) -> usize {
 		NONCE_LENGTH + self.cipher_text.inner.len() + MAC_LENGTH
 	}
-}
-
-#[derive(Clone)]
-pub struct Crypt4Gh {
-	keys: KeyPair,
-	range: std::ops::Range<usize>,
-	seed: Seed,
-}
-
-pub struct Crypt4GhBuilder {
-	keys: KeyPair,
-	range: Option<std::ops::Range<usize>>,
-	seed: Option<Seed>,
 }
 
 /// Multiple recipients and their public keys
@@ -262,6 +249,12 @@ impl Crypt4GHFile {
 	}
 }
 
+#[derive(Clone)]
+pub struct Crypt4Gh {
+	keys: KeyPair,
+	range: std::ops::Range<usize>,
+	seed: Seed,
+}
 
 impl Crypt4Gh {
 	// TODO: Recipients should be Some()
@@ -273,21 +266,26 @@ impl Crypt4Gh {
 		// Create the crypt4gh header.
 		let (header, data_keys) = HeaderWithKeys::from_keypair(recipients, keys)?.into_inner();
 
-		// TODO: Implement for all recipients instead of just the first datake
+		// TODO: Implement for all recipients instead of just the first data_key
 		let data_key = &data_keys[0];
 
+		// Empty DataBlocks and Header Segments sequences
 		let mut data_blocks = DataBlocks::new();
-		// let nonce = Nonce::new(); // FIXME: Careful, nonce should be re-calculated for each header packet
-		// 								 // unclear if the original implementation did that?
+		let mut header_segments = Segment::new();
 
-		// Split into 64Kib segments, and encrypt them.
-		// Encrypt segments
+		// TODO: This loop should sequence the header segments AND the data blocks (body), not just the header segment(s).
 		for data_slice in plaintext.chunks(PLAINTEXT_SEGMENT_SIZE) {
-			let segment = Segment::new_from_key(data_slice, &data_key)?;
-			data_blocks.append_segment(segment);
+			// Split into 64Kib segments, and encrypt them.
+			let header_segment = Segment::new_from_key(data_slice, &data_key)?;
+			let data_block = DataBlock::new(data_slice);
+
+			header_segments.append(header_segment);
+			data_blocks.append(data_block);
 		}
 
-		Ok(Crypt4GHFile::new(header, data_blocks))
+		let mut full_header = header + header_segments;
+
+		Ok(Crypt4GHFile::new(full_header, data_blocks))
 	}
 
 	/// Crypt4gh spec §4.1 - chacha20 ietf poly1305 Decryption
@@ -335,6 +333,12 @@ impl Crypt4Gh {
 
 		Ok(PlainText::from(data_buffer))
 	}
+}
+
+pub struct Crypt4GhBuilder {
+	keys: KeyPair,
+	range: Option<std::ops::Range<usize>>,
+	seed: Option<Seed>,
 }
 
 impl Crypt4GhBuilder {

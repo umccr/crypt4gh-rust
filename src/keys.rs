@@ -9,9 +9,7 @@ use ssh_key::{public::PublicKey as SSHPublicKey, public::Ed25519PublicKey};
 
 use crate::{error::Crypt4GHError, Recipients};
 
-use chacha20poly1305::{
-    aead::{Aead, AeadCore, OsRng}, Nonce
-};
+use chacha20poly1305::aead::OsRng;
 
 
 /// Crypt4GH §3.2

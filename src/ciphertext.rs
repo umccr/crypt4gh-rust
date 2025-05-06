@@ -5,7 +5,7 @@ use chacha20poly1305::AeadInPlace;
 
 use crate::error::Crypt4GHError;
 use crate::header::SharedKey;
-use crate::keys::{KeyPair, PrivateKey};
+use crate::keys::KeyPair;
 use crate::plaintext::PlainText;
 use crate::{Crypt4GHFile, Crypt4GhBuilder, Mac, Nonce, MAC_LENGTH, NONCE_LENGTH, PLAINTEXT_SEGMENT_SIZE};
 
@@ -69,12 +69,6 @@ pub struct DataBlock {
 	mac: Mac,
 }
 
-/// Body Data BlockS.
-#[derive(Debug, Clone)]
-pub struct DataBlocks {
-	blocks: Vec<DataBlock>
-}
-
 impl DataBlock {
 	pub fn to_bytes(&self) -> Vec<u8> {
 		let mut bytes = Vec::with_capacity(NONCE_LENGTH + MAC_LENGTH + PLAINTEXT_SEGMENT_SIZE);
@@ -98,9 +92,15 @@ impl DataBlock {
 	}
 }
 
+/// Body Data BlockS.
+#[derive(Debug, Clone)]
+pub struct DataBlocks {
+	blocks: Vec<DataBlock>
+}
+
 impl DataBlocks {
-	pub fn new(blocks: Vec<DataBlock>) -> Self {
-		Self { blocks }
+	pub fn new() -> Self {
+		Self { blocks: vec![] }
 	}
 
 	pub fn from_bytes(bytes: &[u8]) -> Result<Self, Crypt4GHError> {
