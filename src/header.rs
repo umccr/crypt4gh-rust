@@ -218,6 +218,10 @@ impl SharedKey {
 	pub fn into_inner(self) -> Vec<u8> {
 		self.inner
 	}
+
+	pub fn as_slice(&self) -> &[u8] {
+		self.inner.as_slice()
+	}
 }
 
 /// Implements all header-related operations described in Crypt4gh spec §3.3 - Header packet encryption

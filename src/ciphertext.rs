@@ -1,8 +1,9 @@
 use chacha20poly1305::aead::generic_array::GenericArray;
 use chacha20poly1305::consts::U32;
-use chacha20poly1305::{ChaCha20Poly1305, KeyInit};
+use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use chacha20poly1305::AeadInPlace;
 
+use ssh_key::rand_core::OsRng;
 use crate::error::Crypt4GHError;
 use crate::header::SharedKey;
 use crate::keys::KeyPair;
@@ -90,6 +91,26 @@ impl DataBlock {
 
 		Ok(buffer)
 	}
+
+
+	pub fn encrypt(header_private_key: &SharedKey, mut plaintext: Vec<u8>) -> Result<Self, Crypt4GHError> {
+		let nonce = ChaCha20Poly1305::generate_nonce(OsRng);
+		let header_key = header_private_key.as_slice();
+		let shared_key = GenericArray::<u8, U32>::from_slice(header_key);
+		let encrypt = ChaCha20Poly1305::new(shared_key);
+		
+		let mac = encrypt.encrypt_in_place_detached(&nonce, &[], &mut plaintext).map_err(|_| Crypt4GHError::NoSupportedEncryptionMethod)?;
+		let mac = Mac::from(mac.to_vec());
+		let nonce = Nonce::from(nonce.to_vec());
+
+		Ok(Self {
+			nonce,
+			encrypted_data: EncryptedData {
+				encrypted_data: plaintext
+			},
+			mac
+		})
+	}
 }
 
 /// Body Data BlockS.
@@ -101,6 +122,15 @@ pub struct DataBlocks {
 impl DataBlocks {
 	pub fn new() -> Self {
 		Self { blocks: vec![] }
+	}
+
+	pub fn encrypt(shared_key: &SharedKey, bytes: &[u8]) -> Result<Self, Crypt4GHError> {
+		let mut blocks = vec![];
+		for chunk in bytes.chunks(PLAINTEXT_SEGMENT_SIZE) {
+			blocks.push(DataBlock::encrypt(&shared_key, chunk.to_vec())?);
+		}
+
+		Ok(Self { blocks })
 	}
 
 	pub fn from_bytes(bytes: &[u8]) -> Result<Self, Crypt4GHError> {

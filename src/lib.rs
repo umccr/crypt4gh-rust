@@ -14,7 +14,7 @@ use chacha20poly1305::consts::U32;
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
 use ciphertext::{CipherText, DataBlock, DataBlocks};
-use header::{Header, HeaderWithKeys};
+use header::{Header, HeaderWithKeys, SharedKey};
 use keys::{DataKey, PrivateKey};
 use plaintext::PlainText;
 use chacha20poly1305::aead::OsRng;
@@ -267,25 +267,12 @@ impl Crypt4Gh {
 		let (header, data_keys) = HeaderWithKeys::from_keypair(recipients, keys)?.into_inner();
 
 		// TODO: Implement for all recipients instead of just the first data_key
-		let data_key = &data_keys[0];
+		let shared_key = &data_keys[0];
+		
+		// Encrypt header data blocks
+		let data_blocks = DataBlocks::encrypt(&SharedKey::new(shared_key.as_bytes().to_vec()), plaintext.as_slice())?;
 
-		// Empty DataBlocks and Header Segments sequences
-		let mut data_blocks = DataBlocks::new();
-		let mut header_segments = Segment::new();
-
-		// TODO: This loop should sequence the header segments AND the data blocks (body), not just the header segment(s).
-		for data_slice in plaintext.chunks(PLAINTEXT_SEGMENT_SIZE) {
-			// Split into 64Kib segments, and encrypt them.
-			let header_segment = Segment::new_from_key(data_slice, &data_key)?;
-			let data_block = DataBlock::new(data_slice);
-
-			header_segments.append(header_segment);
-			data_blocks.append(data_block);
-		}
-
-		let mut full_header = header + header_segments;
-
-		Ok(Crypt4GHFile::new(full_header, data_blocks))
+		Ok(Crypt4GHFile::new(header, data_blocks))
 	}
 
 	/// Crypt4gh spec §4.1 - chacha20 ietf poly1305 Decryption
