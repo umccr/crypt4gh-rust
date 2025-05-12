@@ -1,12 +1,30 @@
 use crate::ciphertext::DataBlocks;
 use crate::error::Crypt4GHError;
 use crate::keys::KeyPair;
-use crate::{Crypt4GhBuilder, Recipients};
+use crate::{Crypt4GhBuilder, Recipients, PLAINTEXT_SEGMENT_SIZE};
 
 /// Plaintext newtype, avoids API misuse
 #[derive(Debug)]
 pub struct PlainText {
 	inner: Vec<u8>,
+	pos: usize,
+}
+
+impl ChunkDataBlocks for PlainText {
+	fn next_chunk(&mut self) -> Result<Option<Vec<u8>>, Crypt4GHError> {
+		let previous = self.pos;
+		self.pos += PLAINTEXT_SEGMENT_SIZE;
+
+		if self.pos > self.inner.len() {
+			Ok(None)
+		} else {
+			Ok(Some(self.inner[previous..self.pos].to_vec()))
+		}
+	}
+}
+
+pub trait ChunkDataBlocks {
+	fn next_chunk(&mut self) -> Result<Option<Vec<u8>>, Crypt4GHError>;
 }
 
 pub struct Reader<R> {
@@ -25,18 +43,17 @@ impl<R> Reader<R> {
 
 impl PlainText {
 	pub fn from(payload: Vec<u8>) -> Self {
-		PlainText { inner: payload }
+		PlainText { inner: payload, pos: 0 }
 	}
 
-	pub fn encrypt(
-		self,
+	fn encrypt(
 		plaintext: PlainText,
 		recipients: Recipients,
 		keys: KeyPair,
 	) -> Result<DataBlocks, Crypt4GHError> {
 		// FIXME: Revisit builder and/or this function to adjust .with_range() bounds... 0 is incorrect
 		let cg4h = Crypt4GhBuilder::new(keys.clone()).with_range(0..plaintext.length()).build();
-		let ciphertext = cg4h.encrypt(plaintext, keys, recipients)?;
+		let ciphertext = cg4h.encrypt(Box::new(plaintext), keys, recipients)?;
 		Ok(ciphertext.data_blocks)
 	}
 

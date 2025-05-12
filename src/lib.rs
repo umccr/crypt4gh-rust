@@ -16,7 +16,7 @@ use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
 use ciphertext::{CipherText, DataBlock, DataBlocks};
 use header::{Header, HeaderWithKeys, SharedKey};
 use keys::{DataKey, PrivateKey};
-use plaintext::PlainText;
+use plaintext::{ChunkDataBlocks, PlainText};
 use chacha20poly1305::aead::OsRng;
 use ssh_key::rand_core::RngCore;
 
@@ -258,7 +258,7 @@ pub struct Crypt4Gh {
 
 impl Crypt4Gh {
 	// TODO: Recipients should be Some()
-	pub fn encrypt(&self, plaintext: PlainText, keys: KeyPair, recipients: Recipients) -> Result<Crypt4GHFile, Crypt4GHError> {
+	pub fn encrypt(&self, plaintext: Box<dyn ChunkDataBlocks>, keys: KeyPair, recipients: Recipients) -> Result<Crypt4GHFile, Crypt4GHError> {
 		if recipients.is_empty() {
 			return Err(Crypt4GHError::NoRecipients);
 		}
@@ -270,7 +270,7 @@ impl Crypt4Gh {
 		let shared_key = &data_keys[0];
 		
 		// Encrypt header data blocks
-		let data_blocks = DataBlocks::encrypt(&SharedKey::new(shared_key.as_bytes().to_vec()), plaintext.as_slice())?;
+		let data_blocks = DataBlocks::encrypt(&SharedKey::new(shared_key.as_bytes().to_vec()), plaintext)?;
 
 		Ok(Crypt4GHFile::new(header, data_blocks))
 	}

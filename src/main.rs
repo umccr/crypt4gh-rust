@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crypt4gh::error::Crypt4GHError;
 use crypt4gh::keys::{EncryptionMethod, KeyPair, PrivateKey, get_brainstorm_public_key};
-use crypt4gh::plaintext::PlainText;
+use crypt4gh::plaintext::{ChunkDataBlocks, PlainText};
 use crypt4gh::{CipherText, Crypt4GhBuilder, Recipients};
 use crypt4gh::keys::PublicKey;
 
@@ -48,6 +48,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 	// Encrypt and decrypt payload
 	let recipients = Recipients::from(pubkeys);
 
+	let reader = ChunkDataBlocks::from();
 	let enc = c4gh.encrypt(plaintext, keypair.clone(), recipients)?;
 	let dec = c4gh.decrypt(CipherText::new(enc.to_bytes()), keypair.private_key)?;
 

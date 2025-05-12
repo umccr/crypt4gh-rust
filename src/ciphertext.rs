@@ -7,7 +7,7 @@ use ssh_key::rand_core::OsRng;
 use crate::error::Crypt4GHError;
 use crate::header::SharedKey;
 use crate::keys::KeyPair;
-use crate::plaintext::PlainText;
+use crate::plaintext::{ChunkDataBlocks, PlainText};
 use crate::{Crypt4GHFile, Crypt4GhBuilder, Mac, Nonce, MAC_LENGTH, NONCE_LENGTH, PLAINTEXT_SEGMENT_SIZE};
 
 pub struct Reader<R> {
@@ -124,9 +124,9 @@ impl DataBlocks {
 		Self { blocks: vec![] }
 	}
 
-	pub fn encrypt(shared_key: &SharedKey, bytes: &[u8]) -> Result<Self, Crypt4GHError> {
+	pub fn encrypt(shared_key: &SharedKey, mut bytes: Box<dyn ChunkDataBlocks>) -> Result<Self, Crypt4GHError> {
 		let mut blocks = vec![];
-		for chunk in bytes.chunks(PLAINTEXT_SEGMENT_SIZE) {
+		while let Some(chunk) = bytes.next_chunk()? {
 			blocks.push(DataBlock::encrypt(&shared_key, chunk.to_vec())?);
 		}
 
