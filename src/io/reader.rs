@@ -6,12 +6,20 @@ use crate::plaintext::ChunkDataBlocks;
 use crate::{ciphertext::DataBlocks, error::Crypt4GHError, keys::KeyPair, CipherText, Crypt4GhBuilder};
 use crate::{Crypt4GHFile, PLAINTEXT_SEGMENT_SIZE};
 
+// Generic reader
 pub struct Reader<R> {
     inner: R,
     buf: Vec<u8>,
 }
 
 impl<R> Reader<R> {
+    pub fn new(inner: R) -> Self {
+        Self {
+            inner,
+            buf: Vec::new(),
+        }
+    }
+
     pub fn get_ref(&self) -> &R {
         &self.inner
     }

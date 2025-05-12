@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use crypt4gh::error::Crypt4GHError;
 use crypt4gh::keys::{EncryptionMethod, KeyPair, PrivateKey, get_brainstorm_public_key};
 use crypt4gh::plaintext::{ChunkDataBlocks, PlainText};
-use crypt4gh::{CipherText, Crypt4GhBuilder, Recipients};
+use crypt4gh::Crypt4GHFile;
+use crypt4gh::{ciphertext::CipherText, Crypt4GhBuilder, Recipients};
 use crypt4gh::keys::PublicKey;
 
 use noodles::cram;
@@ -47,10 +48,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 	// Encrypt and decrypt payload
 	let recipients = Recipients::from(pubkeys);
+	//let reader = File::open("path").await.map(io::reader::new());
+	let reader: Box<dyn ChunkDataBlocks> = Box::new(cram_header.into());
 
-	let reader = ChunkDataBlocks::from();
-	let enc = c4gh.encrypt(plaintext, keypair.clone(), recipients)?;
-	let dec = c4gh.decrypt(CipherText::new(enc.to_bytes()), keypair.private_key)?;
+	let enc = c4gh.encrypt(reader, keypair.clone(), recipients)?;
+	let dec = c4gh.decrypt(Crypt4GHFile::new(enc), keypair.private_key)?;
 
 	dbg!(dec);
 
