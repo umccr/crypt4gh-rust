@@ -5,7 +5,6 @@ pub mod keys;
 pub mod plaintext;
 pub mod io;
 
-use std::mem;
 use std::ops::RangeBounds;
 
 use chacha20poly1305::aead::generic_array::GenericArray;
@@ -15,8 +14,9 @@ use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit};
 use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
 use ciphertext::{CipherText, DataBlock, DataBlocks};
 use header::{Header, HeaderWithKeys, SharedKey};
+use io::reader::chunks::ChunkDataBlocks;
 use keys::{DataKey, PrivateKey};
-use plaintext::{ChunkDataBlocks, PlainText};
+use plaintext::PlainText;
 use chacha20poly1305::aead::OsRng;
 use ssh_key::rand_core::RngCore;
 

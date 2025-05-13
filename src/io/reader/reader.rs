@@ -2,7 +2,6 @@ use std::io::Read;
 
 use tokio::io::AsyncRead;
 
-use crate::plaintext::ChunkDataBlocks;
 use crate::{ciphertext::DataBlocks, error::Crypt4GHError, keys::KeyPair, CipherText, Crypt4GhBuilder};
 use crate::{Crypt4GHFile, PLAINTEXT_SEGMENT_SIZE};
 
@@ -54,17 +53,4 @@ impl<R> From<R> for Reader<R> {
 #[derive(Debug)]
 pub struct PlainText<R> {
 	inner: R,
-}
-
-impl<R> ChunkDataBlocks for PlainText<R> where R: Read {
-	fn next_chunk(&mut self) -> Result<Option<Vec<u8>>, Crypt4GHError> {
-        let mut buf = vec![0u8; PLAINTEXT_SEGMENT_SIZE];
-        let read = self.inner.read(&mut buf)?;
-
-        if read == 0 {
-            Ok(None)
-        } else {
-            Ok(Some(buf))
-        }
-	}
 }

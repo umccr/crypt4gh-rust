@@ -6,8 +6,9 @@ use chacha20poly1305::AeadInPlace;
 use ssh_key::rand_core::OsRng;
 use crate::error::Crypt4GHError;
 use crate::header::SharedKey;
+use crate::io::reader::chunks::ChunkDataBlocks;
 use crate::keys::KeyPair;
-use crate::plaintext::{ChunkDataBlocks, PlainText};
+use crate::plaintext::PlainText;
 use crate::{Crypt4GHFile, Crypt4GhBuilder, Mac, Nonce, MAC_LENGTH, NONCE_LENGTH, PLAINTEXT_SEGMENT_SIZE};
 
 pub struct Reader<R> {

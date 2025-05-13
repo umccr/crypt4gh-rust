@@ -10,22 +10,6 @@ pub struct PlainText {
 	pos: usize,
 }
 
-impl ChunkDataBlocks for PlainText {
-	fn next_chunk(&mut self) -> Result<Option<Vec<u8>>, Crypt4GHError> {
-		let previous = self.pos;
-		self.pos += PLAINTEXT_SEGMENT_SIZE;
-
-		if self.pos > self.inner.len() {
-			Ok(None)
-		} else {
-			Ok(Some(self.inner[previous..self.pos].to_vec()))
-		}
-	}
-}
-
-pub trait ChunkDataBlocks {
-	fn next_chunk(&mut self) -> Result<Option<Vec<u8>>, Crypt4GHError>;
-}
 
 pub struct Reader<R> {
 	inner: R,
