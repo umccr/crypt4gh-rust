@@ -258,7 +258,7 @@ pub struct Crypt4Gh {
 
 impl Crypt4Gh {
 	// TODO: Recipients should be Some()
-	pub fn encrypt(&self, plaintext: Box<dyn ChunkDataBlocks>, keys: KeyPair, recipients: Recipients) -> Result<Crypt4GHFile, Crypt4GHError> {
+	pub fn encrypt(&self, plaintext: Reader<PlainText>, keys: KeyPair, recipients: Recipients) -> Result<Crypt4GHFile, Crypt4GHError> {
 		if recipients.is_empty() {
 			return Err(Crypt4GHError::NoRecipients);
 		}

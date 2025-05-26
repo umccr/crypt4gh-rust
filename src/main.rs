@@ -48,8 +48,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 	// Encrypt and decrypt payload
 	let recipients = Recipients::from(pubkeys);
-	//let reader = File::open("path").await.map(io::reader::new());
-	let mut reader: io::reader::ReBox<dyn ChunkDataBlocks> = Box::new(plaintext_header);
+
+	let input_path = env::args().nth(1).expect("file not found");
+	let mut reader = crypt4gh::io::reader::builder();
+	reader.build_from_path(input_path)?;
 
 	while reader.next_chunk()? != None {
 		let enc = c4gh.encrypt(reader, keypair.clone(), recipients.clone())?;

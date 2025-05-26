@@ -37,7 +37,7 @@ impl PlainText {
 	) -> Result<DataBlocks, Crypt4GHError> {
 		// FIXME: Revisit builder and/or this function to adjust .with_range() bounds... 0 is incorrect
 		let cg4h = Crypt4GhBuilder::new(keys.clone()).with_range(0..plaintext.length()).build();
-		let ciphertext = cg4h.encrypt(Box::new(plaintext), keys, recipients)?;
+		let ciphertext = cg4h.encrypt(plaintext, keys, recipients)?;
 		Ok(ciphertext.data_blocks)
 	}
 

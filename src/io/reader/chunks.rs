@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use crate::{error::Crypt4GHError, plaintext::PlainText, PLAINTEXT_SEGMENT_SIZE};
 
 pub trait ChunkDataBlocks {
