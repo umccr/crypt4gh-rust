@@ -32,15 +32,21 @@ impl<R> Reader<R>
 where
     R: AsyncRead + Unpin,
 {
+    async fn read_header(self) -> Header {
+        let bytes = self.inner.read_exact();
+        Header::from_bytes()
+    }
+
+    fn decrypt(&self) -> PlainText {
+        todo!()
+    }
+
     // pub fn decrypt(&mut self, keys: KeyPair, crypt4gh_file: Crypt4GHFile) -> Result<PlainText, Crypt4GHError> {
     //     crypt4gh_file.decrypt(keys)
     // }
 }
 
 impl<R> From<R> for Reader<R> {
-    // TODO
-    //fn read_header
-    //fn read_block
     fn from(inner: R) -> Self {
         Self {
             inner,

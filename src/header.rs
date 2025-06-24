@@ -261,10 +261,10 @@ impl Header {
 		let (packets, data_keys) = packets.into_iter().unzip();
 		Ok((Self::new(packets), data_keys))
 	}
-
+	
 	// TODO: Horrible way to parse, simplify/refactor the for loop with more sensible methods/parsing
 	pub fn from_bytes(bytes: &[u8]) -> Result<Self, Crypt4GHError> {
-		if bytes.len() < MAGIC_NUMBER.len() + mem::size_of::<u32>() * 2 {
+		if bytes.len() < MAGIC_NUMBER.len() + mem::size_of::<u32>() * 2 { // Crypt4gh spec §3.2: byte magic_number[8];
 			return Err(Crypt4GHError::InvalidHeader);
 		}
 

@@ -5,6 +5,7 @@ pub mod keys;
 pub mod plaintext;
 pub mod io;
 
+use std::io::Read;
 use std::ops::RangeBounds;
 
 use chacha20poly1305::aead::generic_array::GenericArray;
@@ -15,6 +16,7 @@ use crypto_kx::{Keypair as CryptoKeyPair, SecretKey as CryptoSecretKey};
 use ciphertext::{CipherText, DataBlock, DataBlocks};
 use header::{Header, HeaderWithKeys, SharedKey};
 use io::reader::chunks::ChunkDataBlocks;
+use io::reader::reader::Reader;
 use keys::{DataKey, PrivateKey};
 use plaintext::PlainText;
 use chacha20poly1305::aead::OsRng;
@@ -270,7 +272,7 @@ impl Crypt4Gh {
 		let shared_key = &data_keys[0];
 		
 		// Encrypt header data blocks
-		let data_blocks = DataBlocks::encrypt(&SharedKey::new(shared_key.as_bytes().to_vec()), plaintext)?;
+		let data_blocks = DataBlocks::encrypt(&SharedKey::new(shared_key.as_bytes().to_vec()), plaintext.into_inner().as_slice().bytes())?;
 
 		Ok(Crypt4GHFile::new(header, data_blocks))
 	}
