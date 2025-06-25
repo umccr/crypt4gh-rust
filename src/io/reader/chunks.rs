@@ -6,16 +6,17 @@ pub trait ChunkDataBlocks {
 	fn next_chunk(&mut self) -> Result<Option<Vec<u8>>, Crypt4GHError>;
 }
 
-impl<R> ChunkDataBlocks for PlainText<R> where R: Read {
+impl ChunkDataBlocks for PlainText {
 	fn next_chunk(&mut self) -> Result<Option<Vec<u8>>, Crypt4GHError> {
-        let mut buf = vec![0u8; PLAINTEXT_SEGMENT_SIZE];
-        let read = self.inner.read(&mut buf)?;
-
-        if read == 0 {
-            Ok(None)
-        } else {
-            Ok(Some(buf))
-        }
+        todo!()
+        // let mut buf = vec![0u8; PLAINTEXT_SEGMENT_SIZE];
+        // let read = self.inner.read(&mut buf)?;
+        //
+        // if read == 0 {
+        //     Ok(None)
+        // } else {
+        //     Ok(Some(buf))
+        // }
 	}
 }
 

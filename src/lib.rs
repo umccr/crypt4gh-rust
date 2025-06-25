@@ -272,9 +272,10 @@ impl Crypt4Gh {
 		let shared_key = &data_keys[0];
 		
 		// Encrypt header data blocks
-		let data_blocks = DataBlocks::encrypt(&SharedKey::new(shared_key.as_bytes().to_vec()), plaintext.into_inner().as_slice().bytes())?;
-
-		Ok(Crypt4GHFile::new(header, data_blocks))
+		todo!();
+		// let data_blocks = DataBlocks::encrypt(&SharedKey::new(shared_key.as_bytes().to_vec()), plaintext.into_inner().as_slice().bytes())?;
+		//
+		// Ok(Crypt4GHFile::new(header, data_blocks))
 	}
 
 	/// Crypt4gh spec §4.1 - chacha20 ietf poly1305 Decryption

@@ -3,10 +3,9 @@ use std::path::PathBuf;
 
 use crypt4gh::error::Crypt4GHError;
 use crypt4gh::keys::{EncryptionMethod, KeyPair, PrivateKey, get_brainstorm_public_key};
-use crypt4gh::plaintext::{ChunkDataBlocks, PlainText};
+use crypt4gh::plaintext::PlainText;
 use crypt4gh::{Crypt4GhBuilder, Recipients};
 use crypt4gh::keys::PublicKey;
-use crate::io::reader::Reader;
 
 use noodles::cram;
 use tokio::fs::File;
@@ -49,15 +48,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 	// Encrypt and decrypt payload
 	let recipients = Recipients::from(pubkeys);
 
-	let input_path = env::args().nth(1).expect("file not found");
-	let mut reader = crypt4gh::io::reader::builder();
-	reader.build_from_path(input_path)?;
-
-	while reader.next_chunk()? != None {
-		let enc = c4gh.encrypt(reader, keypair.clone(), recipients.clone())?;
-		let dec = c4gh.decrypt(enc, keypair.private_key.clone())?;
-		dbg!(dec);
-	}
+	// let input_path = env::args().nth(1).expect("file not found");
+	// let mut reader = crypt4gh::io::reader::builder();
+	// reader.build_from_path(input_path)?;
+	//
+	// while reader.next_chunk()? != None {
+	// 	let enc = c4gh.encrypt(reader, keypair.clone(), recipients.clone())?;
+	// 	let dec = c4gh.decrypt(enc, keypair.private_key.clone())?;
+	// 	dbg!(dec);
+	// }
 
 	// All is fine
 	Ok(())
