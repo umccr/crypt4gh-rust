@@ -4,6 +4,7 @@ pub mod header;
 pub mod keys;
 pub mod plaintext;
 pub mod io;
+pub mod v2;
 
 use std::io::Read;
 use std::ops::RangeBounds;
