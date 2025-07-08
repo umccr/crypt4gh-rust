@@ -9,3 +9,4 @@ pub mod crypt;
 pub mod data_block;
 pub mod error;
 pub mod io;
+mod parsing;

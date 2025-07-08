@@ -2,6 +2,7 @@
 //!
 
 pub mod packet;
+mod error;
 
 use std::array::TryFromSliceError;
 use crate::v2::error::Error::HeaderDecodeError;
@@ -44,19 +45,19 @@ impl Header {
             .map_err(|err: TryFromSliceError| HeaderDecodeError(err.to_string()))?);
 
         for _ in 0..count {
-            match Packet::decode(&buf[packet_pos as usize..])? {
-                Some(amount) => packet_pos += amount,
-                // More data needed.
-                None => return Ok(None)
-            }
+            // match Packet::decode(&buf[packet_pos as usize..])? {
+            //     Some(amount) => packet_pos += amount,
+            //     // More data needed.
+            //     None => return Ok(None)
+            // }
         }
 
         Ok(Some(packet_pos))
     }
 
-    /// Decrypt the header using the key.
-    pub fn decrypt(mut self, key: &[u8]) -> Result<Vec<DecryptedPacket>> {
-        self.packets.into_iter().map(|packet| packet.decrypt(key)).collect()
-    }
+    // /// Decrypt the header using the key.
+    // pub fn decrypt(mut self, key: &[u8]) -> Result<Vec<DecryptedPacket>> {
+    //     self.packets.into_iter().map(|packet| packet.decrypt(key)).collect()
+    // }
 }
 
