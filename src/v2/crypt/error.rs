@@ -1,7 +1,3 @@
-use crate::v2::crypt;
-use crate::v2::header::error;
-use chacha20poly1305::aead;
-use std::array::TryFromSliceError;
 use std::num::TryFromIntError;
 use std::result;
 use thiserror::Error;
@@ -10,10 +6,8 @@ pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug, Error)]
 pub enum Error {
-	#[error("invalid encryption method: {0}")]
-	InvalidEncryptionMethod(u32),
 	#[error("error converting from int: {0}")]
 	IntConversionError(#[from] TryFromIntError),
 	#[error("error parsing encrypted header data: {0}")]
-	EncryptedDataError(#[from] crypt::Error),
+	EncryptedDataError(String),
 }
